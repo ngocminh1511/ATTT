@@ -1,0 +1,4 @@
+• Giải pháp thực sự cho bài toán của bạn: Để giải quyết việc Server tính trung bình (50% A1 + 50% B1) bị lệch, người ta không dùng FedProx mà dùng các hàm tổng hợp an toàn (Robust Aggregation Rules) tại Server như:
+	• Coordinate-wise Median: Lấy giá trị trung vị thay vì trung bình để loại bỏ các giá trị cực đoan từ kẻ tấn công.
+	• Trimmed Mean: Loại bỏ X% các trạm có cập nhật lớn nhất và nhỏ nhất trước khi tính trung bình.
+	• Krum / Multi-Krum: Chọn ra trạm có cập nhật giống với đa số các trạm khác nhất và loại bỏ các trạm "lạc loài" (kẻ tấn công).

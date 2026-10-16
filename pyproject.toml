@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fl-ddos"
+version = "1.0.0"
+description = "Federated Learning + Suricata phân tán phát hiện DDoS"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.13"
+# Cố định phiên bản Flower: API ClientApp/ServerApp/Message thay đổi giữa các bản (mục 9.3).
+# torch cài riêng (bản CUDA hoặc CPU), xem README.
+dependencies = [
+    "flwr[simulation]==1.40.0",
+    "torch>=2.2",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fl_ddos"]
+
+[tool.flwr.app]
+publisher = "student"
+
+[tool.flwr.app.components]
+serverapp = "fl_ddos.server_app:app"
+clientapp = "fl_ddos.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 30
+local-epochs = 2
+lr = 0.001
+batch-size = 256
+proximal-mu = 0.0        # 0 = FedAvg; 0.01 hoặc 0.1 = FedProx
+scenario = "S3"          # S1, S2a, S2b, S3, S4 (lab: "lab")
+seed = 0
+strategy = "fedavg"      # fedavg | trimmed (FedTrimmedAvg, cho E7)
+poison-clients = ""      # E7: partition-id bị đầu độc, vd "0" hoặc "0,3"
+num-clients = 5          # để tính MB truyền thông
+data-dir = ""            # Flower chạy bản sao app trong ~/.flwr/apps -> scripts/fl_run.* truyền đường dẫn tuyệt đối
+results-dir = ""

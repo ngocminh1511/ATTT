@@ -1,0 +1,2 @@
+*.sh text eol=lf
+lab/sensor/entrypoint.sh text eol=lf
