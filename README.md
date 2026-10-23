@@ -122,6 +122,15 @@ Trong lab, mạng `mgmt` chỉ chở trọng số mô hình, còn các mạng `s
 
 **Chưa kiểm chứng:** file compose đã được kiểm tra cú pháp bằng `docker compose config`, nhưng các image chưa được build và lab chưa được chạy thật. Nên chạy `suricata -T` trong container sensor trước. Tên cờ của `flower-supernode` / `flower-superlink` cũng nên đối chiếu với trang "How to run Flower locally" của bản 1.40.
 
+## 7. Notebook phân tích
+
+| Notebook | Nội dung |
+|---|---|
+| `notebooks/01_hieu_dataset.ipynb` | Giải thích CIC-DDoS2019 cho người mới: flow là gì, từng loại tấn công, ý nghĩa 25 đặc trưng, mất cân bằng, chất lượng dữ liệu, **khác biệt giữa hai ngày**, cách chia client S1–S4, kiểm chứng chuẩn hóa liên kết |
+| `notebooks/02_phan_tich_ket_qua.ipynb` | Cách đọc F1/Recall/FPR/AUC, trả lời E1–E7 bằng số liệu trong `results/`, phát hiện FedAvg suy giảm theo vòng, heatmap S3, chi phí truyền thông, tổng kết cho báo cáo |
+
+Notebook đã được chạy sẵn (có output). Để chạy lại: mở trong VS Code, chọn kernel **Python (fl-ddos)** (cài bằng `pip install -e .[notebook]` rồi `python -m ipykernel install --user --name fl-ddos`). Notebook 02 cần thư mục `results/` (chạy `scripts/run_all.ps1` trước).
+
 ## Lỗi thường gặp (mục 9.3)
 
 - F1 = 0,999 ngay từ vòng 1 trên dữ liệu thật: khả năng cao bị rò rỉ dữ liệu. Kiểm tra lại cột định danh và kiểm tra đúng là đang test trên ngày 2.

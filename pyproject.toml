@@ -20,6 +20,9 @@ dependencies = [
     "matplotlib>=3.8",
 ]
 
+[project.optional-dependencies]
+notebook = ["ipykernel", "nbformat", "nbclient"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["fl_ddos"]
 

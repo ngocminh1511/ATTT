@@ -2,3 +2,6 @@
 	• Coordinate-wise Median: Lấy giá trị trung vị thay vì trung bình để loại bỏ các giá trị cực đoan từ kẻ tấn công.
 	• Trimmed Mean: Loại bỏ X% các trạm có cập nhật lớn nhất và nhỏ nhất trước khi tính trung bình.
 	• Krum / Multi-Krum: Chọn ra trạm có cập nhật giống với đa số các trạm khác nhất và loại bỏ các trạm "lạc loài" (kẻ tấn công).
+
+
+ACK: ( Acknowledment) : thông điệp đã tiếp nhận thành công
