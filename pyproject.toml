@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fl-ddos"
 version = "1.0.0"
-description = "Federated Learning + Suricata phân tán phát hiện DDoS"
+description = "Federated Learning phát hiện DDoS (theo Alshdadi et al., Future Internet 2025)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10,<3.13"
@@ -34,15 +34,20 @@ serverapp = "fl_ddos.server_app:app"
 clientapp = "fl_ddos.client_app:app"
 
 [tool.flwr.app.config]
+# Mặc định = thiết lập của paper (mục 5.1): 30 vòng, 5 epoch cục bộ, lr 0.001, dropout 0.3, batch 64, FedAvg.
+# Pipeline cũ (data/, MLP nhị phân): arch='mlp' local-epochs=2 batch-size=256 scenario='S3' (xem scripts/run_all.*).
 num-server-rounds = 30
-local-epochs = 2
+local-epochs = 5
 lr = 0.001
-batch-size = 256
+batch-size = 64
+dropout = 0.3
+arch = "resvgg_swin"     # resvgg_swin | resnet | resnet_vgg | resnet_swin (ablation) | mlp | lstm | lstm_gru
 proximal-mu = 0.0        # 0 = FedAvg; 0.01 hoặc 0.1 = FedProx
-scenario = "S3"          # S1, S2a, S2b, S3, S4 (lab: "lab")
+scenario = "paper"       # paper (data_paper/) | S1, S2a, S2b, S3, S4 (data/)
 seed = 0
 strategy = "fedavg"      # fedavg | trimmed (FedTrimmedAvg, cho E7)
 poison-clients = ""      # E7: partition-id bị đầu độc, vd "0" hoặc "0,3"
-num-clients = 5          # để tính MB truyền thông
+num-clients = 3          # để tính MB truyền thông
+tag-suffix = ""          # thêm vào tên file kết quả, vd "_leak" khi so sánh các biến thể tiền xử lý
 data-dir = ""            # Flower chạy bản sao app trong ~/.flwr/apps -> scripts/fl_run.* truyền đường dẫn tuyệt đối
 results-dir = ""

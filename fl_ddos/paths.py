@@ -1,9 +1,8 @@
 """Đường dẫn tuyệt đối dùng chung cho toàn dự án.
 
-Có thể ghi đè bằng biến môi trường (dùng trong container Docker):
+Có thể ghi đè bằng biến môi trường:
   FL_DDOS_DATA        thư mục data/ (chứa features.json, scaler.json, S*/, test_day2.parquet)
   FL_DDOS_RESULTS     thư mục results/
-  FL_DDOS_LOCAL_DATA  file parquet cục bộ của sensor (lab), thay cho data/{scenario}/client_k.parquet
 """
 import os
 from pathlib import Path
@@ -11,7 +10,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("FL_DDOS_DATA", ROOT / "data"))
 RESULTS = Path(os.environ.get("FL_DDOS_RESULTS", ROOT / "results"))
-LOCAL_DATA = os.environ.get("FL_DDOS_LOCAL_DATA")  # None khi chạy simulation
 
 FEATURES_JSON = DATA / "features.json"
 SCALER_JSON = DATA / "scaler.json"

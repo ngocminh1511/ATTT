@@ -1,3 +1,4 @@
+# Pipeline CŨ (MLP nhị phân, data/, 5 client). Pipeline paper: scripts/run_paper.ps1
 # Ma trận thí nghiệm E1–E5 (mục 6.6 + 8.2), mỗi cấu hình 3 seed. Chạy từ thư mục gốc dự án:
 #   .\scripts\run_all.ps1                 # đầy đủ (30 vòng)
 #   .\scripts\run_all.ps1 -Rounds 3 -Seeds 0 -Epochs 2   # chạy thử nhanh
@@ -17,12 +18,12 @@ foreach ($seed in $Seeds) {
     foreach ($sc in $Scenarios) {
         foreach ($mu in $Mus) {
             Write-Host "=== FL scenario=$sc mu=$mu seed=$seed ===" -ForegroundColor Cyan
-            & .\scripts\fl_run.ps1 "num-server-rounds=$Rounds scenario='$sc' proximal-mu=$mu seed=$seed"
+            & .\scripts\fl_run.ps1 "num-server-rounds=$Rounds scenario='$sc' proximal-mu=$mu seed=$seed arch='mlp' local-epochs=2 batch-size=256 dropout=0.2" -Clients 5 -DataDir data -ResultsDir results
             if ($LASTEXITCODE -ne 0) { throw "flwr run thất bại ($sc, mu=$mu, seed=$seed)" }
         }
     }
-    & $py baselines/centralized.py --scenario S1 --epochs $Epochs --seed $seed
-    foreach ($sc in @("S1", "S3")) { & $py baselines/local_only.py --scenario $sc --epochs $Epochs --seed $seed }
+    & $py baselines/centralized.py --scenario S1 --epochs $Epochs --seed $seed --arch mlp --batch-size 256 --dropout 0.2
+    foreach ($sc in @("S1", "S3")) { & $py baselines/local_only.py --scenario $sc --epochs $Epochs --seed $seed --arch mlp --batch-size 256 --dropout 0.2 }
 }
 
 # E7 (tuỳ chọn): client 1 bị chiếm và đảo nhãn, so sánh FedAvg với FedTrimmedAvg

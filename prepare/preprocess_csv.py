@@ -1,9 +1,9 @@
-"""Nhánh A (mục 4.2): tiền xử lý CSV/Parquet CIC-DDoS2019.
+"""Mục 4.2: tiền xử lý CSV/Parquet CIC-DDoS2019.
 
 Output (trong --out, mặc định data/):
   train_pool.parquet  ngày 12/01, dùng để chia cho các client (split_clients.py)
   test_day2.parquet   ngày 11/03, test toàn cục
-  features.json       {"branch": "A", "features": [...]}
+  features.json       {"features": [...]}
 
 Ví dụ:
   python prepare/preprocess_csv.py --train-glob "data/raw/01-12/*.csv" --test-glob "data/raw/03-11/*.csv"
@@ -125,7 +125,7 @@ def main():
     print("[4/4] Ghi kết quả")
     finalize(train, feats).to_parquet(out / "train_pool.parquet", index=False)
     finalize(test, feats).to_parquet(out / "test_day2.parquet", index=False)
-    json.dump({"branch": "A", "features": feats}, open(out / "features.json", "w", encoding="utf-8"), indent=2)
+    json.dump({"features": feats}, open(out / "features.json", "w", encoding="utf-8"), indent=2)
     print("  train:", train["label"].value_counts().to_dict())
     print("  test :", test["label"].value_counts().to_dict())
 

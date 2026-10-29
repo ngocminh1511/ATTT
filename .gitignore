@@ -4,7 +4,7 @@ __pycache__/
 data/
 !data/.gitkeep
 results/
-lab/logs/
-lab/pcaps/
 *.pt
 logs/
+data_paper*/
+results_*/

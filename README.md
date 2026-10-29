@@ -1,30 +1,31 @@
-# Federated Learning + Suricata phân tán phát hiện DDoS
+# Federated Learning phát hiện DDoS (theo ResVGG-SwinNet)
 
-Cài đặt pipeline mô tả trong `docs/Federated Learning + Suricata phân tán phát hiện DDoS — Pipeline đồ án cuối kỳ.docx`:
-nhiều sensor Suricata, mỗi sensor là một FL client, chỉ gửi trọng số mô hình về server. Server gộp bằng FedAvg/FedProx,
-sau đó mô hình toàn cục được triển khai ngược về sensor để phát hiện DDoS thời gian thực.
+Cài đặt lại phương pháp của bài báo trong `docs/futureinternet-17-00088-v2 1.pdf`:
+
+> Alshdadi et al., *Federated Deep Learning for Scalable and Privacy-Preserving DDoS Attack Detection in IoT Networks*, Future Internet 2025, 17, 88.
+
+Mỗi client train mô hình ResVGG-SwinNet trên dữ liệu của mình và chỉ gửi trọng số về server, server gộp bằng FedAvg. Dữ liệu được tiền xử lý theo đúng chuỗi bước của paper (AFN, CTA, MTB, DPCA, DAS, FDP, FRP). Hiện tại mới làm trên **CIC-DDoS2019**. UNSW-NB15 và IoT-23 làm sau.
+
+Pipeline cũ (FL + Suricata, mô tả trong file `.docx` ở `docs/`) đã bỏ phần Suricata. Phần FL nhị phân với MLP và các kịch bản S1–S4 vẫn giữ lại để so sánh (mục 6).
 
 ## Cấu trúc
 
-| Thư mục / file | Mục trong tài liệu | Nội dung |
+| Thư mục / file | Mục trong paper | Nội dung |
 |---|---|---|
-| `fl_ddos/features.py` | 4.3, 7.2 | Tiền xử lý **dùng chung** cho train và realtime: slog1p, đặc trưng flow eve.json, cửa sổ 1 giây theo `dest_ip`, chuẩn hóa nhãn CIC |
-| `fl_ddos/task.py` | 6.3 | `DDoSNet` (MLP ~10–12k tham số), nạp dữ liệu, train (class weight + FedProx), metric |
-| `fl_ddos/client_app.py` / `server_app.py` | 6.4, 6.5 | Flower ClientApp/ServerApp (Message API, Flower 1.40), FedAvg hoặc FedTrimmedAvg |
-| `prepare/make_synthetic.py` | — | Sinh dữ liệu **giả** (CSV kiểu CIC + eve.json) để chạy thử khi chưa có dataset |
-| `prepare/preprocess_csv.py` | 4.2 | Nhánh A: CSV/Parquet CIC-DDoS2019 → `train_pool.parquet`, `test_day2.parquet`, `features.json` |
-| `prepare/suricata_to_features.py` | 4.3 | Nhánh B: eve.json + file khoảng tấn công → đặc trưng Suricata |
-| `prepare/split_clients.py` | 4.4 | Chia S1 (IID), S2a/S2b (Dirichlet α = 0,5 / 0,1), S3 (theo loại tấn công), S4 (lệch kích thước) |
-| `prepare/federated_scaler.py` | 4.5 | Chuẩn hóa liên kết: client chỉ gửi n, Σx, Σx² → `scaler.json` |
-| `baselines/` | 6.7 | Centralized (cận trên), Local-only (cận dưới) |
-| `detector/realtime.py` | 7.2, 7.3 | Theo dõi eve.json, chấm điểm từng flow, cảnh báo theo cửa sổ, tuỳ chọn chế độ IPS (`--drop-rules`) |
-| `analysis/plots.py` | 8.3, 8.4 | `results/summary.md` + các hình F1 theo vòng, cột F1, ma trận nhầm lẫn/ROC, heatmap recall, boxplot độ trễ |
-| `lab/` | 5, 7, E6 | Docker Compose: fl-server, 3 chi nhánh (victim + sensor), attacker; `measure_latency.py` |
-| `scripts/` | 6.6 | `fl_run.*` (bọc `flwr run`), `run_all.*` (ma trận E1–E5 × 3 seed) |
+| `fl_ddos/paper_prep.py` | 3.2–3.6 | AFN, TEC, CTA, DPCA (WIS + FBSA), MTB, DAS (CRA + IDF), NDS/JAA, DRA, LIS. Bước nào cần thống kê toàn cục thì client chỉ gửi tổng, server gộp |
+| `prepare/paper_pipeline.py` | 3.2–3.6, Eq.13 | CIC-DDoS2019 → `data_paper/` (3 client, đa lớp) |
+| `fl_ddos/models.py` | 3.7, Bảng 12 | ResVGG-SwinNet, các biến thể ablation (`resnet`, `resnet_vgg`, `resnet_swin`), baseline `mlp`, `lstm`, `lstm_gru` |
+| `fl_ddos/task.py` | 4 | Nạp dữ liệu, train (class weight MTB, FedProx), metric: F1/Recall/FAR/AUC (nhị phân) + MSI, F1-macro, Log Loss, AUC-OvR (đa lớp) |
+| `fl_ddos/client_app.py` / `server_app.py` | 3.7.2, Bảng 6, 8 | Flower ClientApp/ServerApp (Flower 1.40), FedAvg hoặc FedTrimmedAvg. Ghi thời gian, bộ nhớ, ‖Δw‖ của từng client |
+| `baselines/` | — | Centralized (cận trên), Local-only (cận dưới), chọn được kiến trúc |
+| `analysis/plots.py` | 5.2 | `summary.md`, F1 theo vòng, cột F1, ma trận nhầm lẫn nhị phân + đa lớp, ROC, heatmap theo loại tấn công |
+| `fl_ddos/features.py` | — | `slog1p`, đọc `features.json`/`scaler.json`, chuẩn hóa tên nhãn CIC |
+| `prepare/preprocess_csv.py`, `split_clients.py`, `federated_scaler.py`, `make_synthetic.py` | — | Pipeline cũ (mục 6) |
+| `scripts/` | — | `fl_run.*` (bọc `flwr run`), `run_all.*` (ma trận cũ E1–E5) |
 
 ## 1. Môi trường
 
-Venv đã được tạo sẵn tại `.venv` (Python 3.12, torch 2.14.1+cu126, flwr 1.40.0). Danh sách phiên bản đầy đủ nằm trong `requirements.lock.txt`. Nếu cần cài lại:
+Venv có sẵn ở `.venv` (Python 3.12, torch 2.14.1+cu126, flwr 1.40.0). Phiên bản đầy đủ nằm trong `requirements.lock.txt`. Nếu cần cài lại:
 
 ```powershell
 python -m venv .venv
@@ -33,106 +34,135 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-**Lưu ý về Flower 1.40** (đã được xử lý trong `scripts/fl_run.ps1` / `fl_run.sh`, nên hãy luôn chạy FL qua script này):
-- Mục `[tool.flwr.federations]` trong pyproject đã bị bỏ. Số client được truyền bằng `--federation-config "num-supernodes=5"`.
-- Mặc định Flower tạo một môi trường riêng và cài lại dependency cho mỗi run. Script đặt `FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1` để dùng luôn venv có torch CUDA.
-- App chạy từ bản sao trong `~/.flwr/apps/`, nên script truyền đường dẫn tuyệt đối qua run-config `data-dir` / `results-dir`.
-- Mỗi Ray actor nạp torch (khoảng 0,5 GB RAM). Với máy 16 GB, script giới hạn 3 actor chạy song song (`-Actors 3`). Lỗi `MemoryError: Unable to allocate internal buffer` nghĩa là cần giảm số này.
-- Nếu đổi biến môi trường mà không thấy tác dụng: SuperLink cục bộ vẫn chạy nền với môi trường cũ. Dừng tiến trình `flower-superlink` rồi chạy lại.
+**Lưu ý về Flower 1.40** (`scripts/fl_run.ps1` / `fl_run.sh` đã xử lý sẵn, nên luôn chạy FL qua script):
+- Số client truyền bằng `--federation-config "num-supernodes=3"`. Script làm việc này qua tham số `-Clients`.
+- Script đặt `FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1` để dùng luôn venv có torch CUDA.
+- App chạy từ bản sao trong `~/.flwr/apps/`, nên script truyền đường dẫn tuyệt đối qua `data-dir` / `results-dir`. Mặc định là `data_paper/` và `results_paper/`.
+- Đổi biến môi trường mà không thấy tác dụng: SuperLink cục bộ vẫn chạy nền với môi trường cũ. Dừng `flower-superlink` rồi chạy lại.
 
-## 2. Dữ liệu (Nhánh A — CSV CIC-DDoS2019)
+**RAM và GPU.** Mỗi Ray actor nạp torch CUDA, tốn khoảng 0,5–1 GB RAM. Máy 16 GB đang mở nhiều ứng dụng sẽ gặp các lỗi sau:
 
-Tải bản đã làm sạch trên Kaggle `dhoogla/cicddos2019` (Parquet), hoặc CSV gốc từ UNB, rồi đặt vào `data/raw/`.
+| Lỗi | Cách xử lý |
+|---|---|
+| `paging file is too small` (WinError 1455) | Giảm `-Actors` (về 1), đóng bớt ứng dụng |
+| `available for tasks and actors (0.03 GB) is less than 0%` | `$env:RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION = "0.15"`, dừng `flower-superlink` rồi chạy lại |
+| `CUDA-capable device(s) is/are busy or unavailable` | Ray chỉ cho actor thấy GPU khi được cấp, nên thêm `-Gpus 1` |
 
-```powershell
-# CSV gốc: data/raw/01-12/*.csv (ngày train) và data/raw/03-11/*.csv (ngày test)
-python prepare/preprocess_csv.py
-# hoặc bản Kaggle (parquet):
-#   CHÚ Ý: tên file của bản Kaggle bị đảo so với tài liệu: *-testing = ngày 12/01 (DrDoS_*, NTP, TFTP…),
-#   *-training = ngày 11/03 (có Portmap). Bản này không có SSDP, WebDDoS chỉ 51 mẫu.
-python prepare/preprocess_csv.py --train-glob "data/raw/cicddos2019/*-testing.parquet" --test-glob "data/raw/cicddos2019/*-training.parquet"
+Cấu hình gợi ý cho ResVGG-SwinNet: `.\scripts\fl_run.ps1 "..." -Actors 1 -Gpus 1`. Ba client sẽ lần lượt dùng GPU.
 
-python prepare/split_clients.py          # data/S1 S2a S2b S3 S4/client_1..5.parquet + summary.csv
-python prepare/federated_scaler.py       # data/scaler.json
-```
+## 2. Dữ liệu theo paper (CIC-DDoS2019)
 
-Các bước này đảm bảo theo tài liệu: bỏ các cột định danh (IP, Flow ID, Timestamp, port nguồn…); train lấy ngày 12/01, test lấy ngày 11/03 (không chia ngẫu nhiên trong cùng một ngày); PortScan chỉ có ở tập test; scaler không fit trên dữ liệu gộp.
-
-**Chưa có dataset?** Chạy `python prepare/make_synthetic.py`, sau đó chạy `preprocess_csv.py` với `--train-glob "data/raw/synthetic/01-12/*.csv" --test-glob "data/raw/synthetic/03-11/*.csv"`. Dữ liệu giả chỉ để kiểm tra code chạy được, **không dùng làm kết quả báo cáo** (F1 ≈ 0,99 vì dữ liệu dễ).
-
-## 3. Huấn luyện liên kết + baseline (E1–E5, E7)
+Tải bản đã làm sạch trên Kaggle `dhoogla/cicddos2019` (Parquet) rồi đặt vào `data/raw/cicddos2019/`. **Tên file của bản này bị đảo**: `*-testing.parquet` là ngày 12/01 (DrDoS_*, NTP, TFTP…), `*-training.parquet` là ngày 11/03 (có Portmap). Script đã đặt mặc định theo đúng chiều này.
 
 ```powershell
-.\scripts\fl_run.ps1 "scenario='S3'"                                  # FedAvg, 30 vòng
-.\scripts\fl_run.ps1 "scenario='S3' proximal-mu=0.1 seed=1"            # FedProx
-.\scripts\fl_run.ps1 "scenario='S1' poison-clients='0' strategy='trimmed'"   # E7
-python baselines/centralized.py --scenario S1 --epochs 60
-python baselines/local_only.py  --scenario S3 --epochs 60
-
-.\scripts\run_all.ps1                                                 # toàn bộ ma trận × 3 seed (rất lâu)
-.\scripts\run_all.ps1 -Rounds 2 -Seeds 0 -Epochs 2 -Scenarios S1,S3 -Mus 0.0,0.1   # chạy thử nhanh
-python analysis/plots.py                                              # results/figures/*.png + results/summary.md
+python prepare/paper_pipeline.py                                    # -> data_paper/ (mặc định: test = ngày 11/03)
+python prepare/paper_pipeline.py --split random --out data_paper_random   # test = 20% ngày 12/01, giống paper
+python prepare/paper_pipeline.py --afn label --out data_paper_leak        # AFN nguyên văn paper, để minh họa rò rỉ nhãn
 ```
 
-Kết quả FL nằm trong `results/fl/{scenario}_mu{μ}_{strategy}_seed{n}.csv`, mỗi dòng là một vòng. Mỗi dòng gồm F1/Recall/FPR/AUC/PR-AUC trên test ngày 2, `comm_MB`, F1 cục bộ trung bình và độ lệch F1 giữa các client. Mô hình cuối được lưu ở `*_global.pt`.
+Các bước chạy theo đúng thứ tự trong paper:
 
-## 4. Nhánh B — đặc trưng Suricata (cần cho phát hiện realtime)
+| Bước | Paper | Ở đâu | Ghi chú |
+|---|---|---|---|
+| log1p | — | tại chỗ | `slog1p` cho mọi đặc trưng (CIC rất lệch đuôi). Paper không nói |
+| TEC | Eq.11 | trên từng file, trước khi lấy mẫu | `flow_packets_s`, `flow_bytes_s`, `flow_iat_mean`, cửa sổ τ = 10 flow trước đó |
+| Chia client | Eq.13 | — | 3 client, mỗi phần giữ phân phối nhãn như tập gốc (paper Bảng 6: 3 client cho mỗi dataset) |
+| AFN | Eq.1 | liên kết | z-score theo nhóm **protocol** (TCP/UDP/khác) |
+| CTA | Eq.2 | cục bộ | Thêm 20% mẫu bằng cách trộn hai mẫu cùng lớp, gần nhau theo thời gian |
+| DPCA | Eq.4–6 | cục bộ | WIS sinh mẫu cho lớp dưới n̄, FBSA bớt lớp trên n̄. Mọi lớp về ≈ n̄ |
+| MTB | Eq.3 | cục bộ | Class weight cho loss → `{scenario}/mtb_weights.json` |
+| DAS | Eq.7–9 | liên kết | Relevance r² với từng lớp; bỏ đặc trưng tương quan ≥ γ = 0,9; giữ tối đa 25 |
+| FDP | Eq.10, 12 | tại chỗ | NDS cho các cặp trong 4 đặc trưng đầu, JAA cho 2 bộ ba |
+| FRP | Eq.14–15 | liên kết | DRA (min-max về [0, 1]), sau đó nhân hệ số LIS |
 
-```bash
-# Trong WSL/Docker: phát lại PCAP qua Suricata
-suricata -c lab/sensor/suricata.yaml -r attack.pcap -l out/day1 -k none
-```
+Output trong `data_paper/`:
+- `features.json`: đặc trưng cuối, danh sách lớp, các đặc trưng được DAS chọn.
+- `prep_params.json`: relevance DAS của mọi đặc trưng, min/max của DRA, hệ số LIS. Dùng để vẽ hình 11–12 của paper.
+- `paper/client_1..3.parquet`.
+- `paper/summary.csv`: số mẫu mỗi lớp trước/sau DPCA (hình 6).
+- `paper/mtb_weights.json`.
+- `test_day2.parquet`.
+
+Tập test chỉ đi qua các phép biến đổi đã fit trên train, không bị sinh hay bớt mẫu.
+
+### Những chỗ khác paper (và lý do)
+
+1. **AFN không nhóm theo nhãn.** Eq.1 chuẩn hóa riêng nhóm attack và nhóm normal, tức là phải biết nhãn mới chọn được μ, σ. Lúc test không có nhãn, nên nếu dùng nhãn thật thì đó là rò rỉ nhãn. Code nhóm theo protocol vì protocol đọc được từ header. `--afn label` giữ đúng cách của paper để so sánh, và tập test khi đó dùng nhãn thật.
+2. **Thời gian = thứ tự dòng trong file.** Bản Kaggle không có cột Timestamp. TEC, CTA và MTB dùng `t_order` (thứ tự dòng trong file) thay cho thời gian. TEC tính trên toàn bộ file trước khi lấy mẫu, chỉ nhìn về phía trước.
+3. **Eq.3 (MTB)** cho trọng số lớn với lớp xuất hiện nhiều. Code dùng nghịch đảo của nó làm class weight (chuẩn hóa về trung bình 1, cắt trong [0,1; 10]).
+4. **Cách đưa dữ liệu vào CNN/Swin.** Paper không nói cách đưa vector đặc trưng vào CNN/Swin. Code chiếu F đặc trưng thành lưới 8×8 bằng một lớp Linear, sau đó là 2 ResBlock (32 kênh), 2 conv VGG 3×3 (64 kênh), 2 khối Swin (cửa sổ 4, dịch 2) và softmax. Code dùng GroupNorm thay BatchNorm, vì FedAvg trung bình hóa running-stats của BatchNorm sẽ làm lệch mô hình.
+5. **Chia train/test.** Mặc định test trên **ngày khác** (11/03). Đây là cách chặt chẽ hơn paper: paper không nêu cách chia, và số 99% thường đến từ việc chia ngẫu nhiên trong cùng ngày. `--split random` cho phép so sánh hai cách chia.
+6. **Lớp chỉ có ở test.** PortScan chỉ có ở ngày test và mô hình chưa từng thấy lớp này. Nó chỉ được tính vào phần phát hiện nhị phân (tấn công / BENIGN), không tính vào MSI hay F1-macro.
+7. **OES (Optimisation Efficiency Score)** không có công thức trong paper. Server ghi thời gian, bộ nhớ đỉnh và ‖Δw‖ của từng client (`*_clients.csv`) để định nghĩa OES sau.
+
+## 3. Huấn luyện liên kết
+
+Mặc định trong `pyproject.toml` lấy theo paper mục 5.1: 30 vòng, 5 epoch cục bộ, lr 0.001, dropout 0.3, batch 64, FedAvg, `arch = "resvgg_swin"`.
+
 ```powershell
-python prepare/suricata_to_features.py --train-eve out/day1/eve.json --train-labels day1_attacks.csv `
-    --test-eve out/day2/eve.json --test-labels day2_attacks.csv --out data_eve
-$env:FL_DDOS_DATA = "$PWD\data_eve"
-python prepare/split_clients.py --n-clients 3 --scenarios S1; python prepare/federated_scaler.py
-Remove-Item Env:FL_DDOS_DATA
-.\scripts\fl_run.ps1 "scenario='S1'" -Clients 3 -DataDir data_eve -ResultsDir results_eve
+.\scripts\fl_run.ps1 "" -Actors 1 -Gpus 1                                  # ResVGG-SwinNet, 3 client, 30 vòng
+.\scripts\fl_run.ps1 "num-server-rounds=2 local-epochs=1" -Actors 1 -Gpus 1  # chạy thử nhanh
+.\scripts\fl_run.ps1 "arch='resnet'" -Actors 1 -Gpus 1                     # ablation: resnet | resnet_vgg | resnet_swin
+.\scripts\fl_run.ps1 "arch='lstm'" -Actors 1 -Gpus 1                       # baseline: mlp | lstm | lstm_gru
+.\scripts\fl_run.ps1 "tag-suffix='_random'" -DataDir data_paper_random -ResultsDir results_paper -Actors 1 -Gpus 1
+
+$env:FL_DDOS_DATA = "$PWD\data_paper"; $env:FL_DDOS_RESULTS = "$PWD\results_paper"
+python baselines/centralized.py --scenario paper --epochs 150    # = 30 vòng × 5 epoch
+python baselines/local_only.py  --scenario paper --epochs 150
+python analysis/plots.py                                          # results_paper/figures/*.png + summary.md
 ```
-Nhãn lấy từ file CSV `label,start,end,dest_ip,src_ip` (cùng định dạng `attack_log.csv` của lab). Có thể thử ngay bằng `data/raw/synthetic_eve/day{1,2}/`.
 
-## 5. Phát hiện thời gian thực
+Kết quả nằm trong `results_paper/fl/`:
 
-```powershell
-$env:FL_DDOS_DATA = "$PWD\data_eve"     # features.json phải là Nhánh B
-python detector/realtime.py --model results_eve/fl/S1_mu0.0_fedavg_seed0_global.pt `
-    --eve data/raw/synthetic_eve/day2/eve.json --replay
-```
-Lệnh trên in các `ml_alert`, ghi `ml_alerts.json` cạnh eve.json, và cuối cùng in thời gian suy luận theo ms/flow. Khi chạy thật thì bỏ `--replay` (đọc tiếp eve.json giống `tail -f`). Thêm `--drop-rules ml.rules` để chuyển sang chế độ IPS.
+| File | Nội dung |
+|---|---|
+| `{scenario}_{arch}_mu{μ}_{strategy}_seed{n}.csv` | Mỗi vòng một dòng: F1/Recall/FAR/AUC (nhị phân), MSI, F1-macro, Log Loss, AUC-OvR, `comm_MB`, F1 cục bộ TB và độ lệch giữa client |
+| `*_clients.csv` | Mỗi vòng × client: loss, số mẫu, thời gian train, bộ nhớ GPU đỉnh, ‖Δw‖ |
+| `*_global.pt` | `{"arch", "dropout", "state_dict"}` của mô hình cuối |
 
-## 6. Lab Docker (E6)
+Ngoài ra có `results_paper/per_attack.csv` (tỉ lệ bị gắn là tấn công theo từng loại) và `per_class.csv` (recall đúng loại tấn công).
 
-```powershell
-# 1) Dữ liệu cục bộ cho 3 chi nhánh (Nhánh B) + đặt data/features.json, data/scaler.json, data/test_day2.parquet của Nhánh B
-python prepare/split_clients.py --n-clients 3 --scenarios S1 --tag lab      # -> data/lab/client_1..3.parquet
-# 2) Dựng lab (Docker Desktop + WSL2)
-docker compose -f lab/docker-compose.yml up -d --build
-# 3) Khai báo SuperLink của lab cho CLI: thêm vào %USERPROFILE%\.flwr\config.toml
-#    [superlink.lab]
-#    address = "127.0.0.1:9093"
-#    insecure = true
-.\.venv\Scripts\flwr.exe run . lab --stream --run-config "scenario='lab' num-clients=3"
-# 4) Triển khai mô hình: copy results\fl\lab_..._global.pt thành results\global.pt (sensor tự nạp)
-# 5) Tấn công trong mạng cô lập + đo
-docker compose -f lab/docker-compose.yml exec attacker bash /lab/traffic.sh site1-victim all
-python lab/measure_latency.py            # results/lab_latency.csv; sau đó chạy analysis/plots.py
-```
-Trong lab, mạng `mgmt` chỉ chở trọng số mô hình, còn các mạng `siteN` chở traffic và đều có `internal: true`. Sensor dùng chung network namespace với victim để Suricata thấy được traffic. Attacker dùng `hping3 -i u100` thay cho `--flood` và bị giới hạn CPU để tránh treo laptop.
+FedProx (`proximal-mu`), FedTrimmedAvg (`strategy='trimmed'`) và đầu độc nhãn (`poison-clients`) vẫn có, nhưng paper chỉ dùng FedAvg.
 
-**Chưa kiểm chứng:** file compose đã được kiểm tra cú pháp bằng `docker compose config`, nhưng các image chưa được build và lab chưa được chạy thật. Nên chạy `suricata -T` trong container sensor trước. Tên cờ của `flower-supernode` / `flower-superlink` cũng nên đối chiếu với trang "How to run Flower locally" của bản 1.40.
+## 4. Phân tích
 
-## 7. Notebook phân tích
+`analysis/plots.py` sinh ra:
+- `f1_vs_round.png`, `bar_f1.png`.
+- `confusion_roc.png`: nhị phân + ROC.
+- `confusion_multiclass.png`: hàng là nhãn thật trên test, kể cả PortScan; chuẩn hóa theo hàng.
+- `heatmap_recall_{scenario}.png`.
+- `summary.md`: thêm cột MSI và F1-macro.
+
+Mặc định đọc `data_paper/` + `results_paper/`. Với pipeline cũ thì thêm `--data-dir data --results-dir results`.
+
+Chưa làm: kiểm định thống kê (paper Bảng 11), phân tích độ nhạy lr × dropout (Hình 15), OES, UNSW-NB15 và IoT-23.
+
+## 5. Notebook
 
 | Notebook | Nội dung |
 |---|---|
-| `notebooks/01_hieu_dataset.ipynb` | Giải thích CIC-DDoS2019 cho người mới: flow là gì, từng loại tấn công, ý nghĩa 25 đặc trưng, mất cân bằng, chất lượng dữ liệu, **khác biệt giữa hai ngày**, cách chia client S1–S4, kiểm chứng chuẩn hóa liên kết |
-| `notebooks/02_phan_tich_ket_qua.ipynb` | Cách đọc F1/Recall/FPR/AUC, trả lời E1–E7 bằng số liệu trong `results/`, phát hiện FedAvg suy giảm theo vòng, heatmap S3, chi phí truyền thông, tổng kết cho báo cáo |
+| `notebooks/01_hieu_dataset.ipynb` | Giải thích CIC-DDoS2019: flow, từng loại tấn công, ý nghĩa đặc trưng, mất cân bằng, khác biệt giữa hai ngày, cách chia client S1–S4 |
+| `notebooks/02_phan_tich_ket_qua.ipynb` | Đọc kết quả E1–E7 của **pipeline cũ** (`results/`) |
 
-Notebook đã được chạy sẵn (có output). Để chạy lại: mở trong VS Code, chọn kernel **Python (fl-ddos)** (cài bằng `pip install -e .[notebook]` rồi `python -m ipykernel install --user --name fl-ddos`). Notebook 02 cần thư mục `results/` (chạy `scripts/run_all.ps1` trước).
+Mở bằng kernel **Python (fl-ddos)**: `pip install -e .[notebook]` rồi `python -m ipykernel install --user --name fl-ddos`.
 
-## Lỗi thường gặp (mục 9.3)
+## 6. Pipeline cũ (MLP nhị phân, S1–S4)
 
-- F1 = 0,999 ngay từ vòng 1 trên dữ liệu thật: khả năng cao bị rò rỉ dữ liệu. Kiểm tra lại cột định danh và kiểm tra đúng là đang test trên ngày 2.
-- Detector báo động loạn: `features.json`/`scaler.json` của detector không cùng Nhánh B với mô hình.
-- `UnicodeEncodeError` trên Windows: đặt `$env:PYTHONIOENCODING="utf-8"` (các script trong `scripts/` đã đặt sẵn).
+Giữ lại để so sánh FedAvg/FedProx dưới các kiểu Non-IID. Dữ liệu ở `data/`, kết quả ở `results/`, 5 client.
+
+```powershell
+python prepare/preprocess_csv.py --train-glob "data/raw/cicddos2019/*-testing.parquet" --test-glob "data/raw/cicddos2019/*-training.parquet"
+python prepare/split_clients.py          # data/S1 S2a S2b S3 S4/client_1..5.parquet
+python prepare/federated_scaler.py       # data/scaler.json
+.\scripts\fl_run.ps1 "scenario='S3' arch='mlp' local-epochs=2 batch-size=256 dropout=0.2" -Clients 5 -DataDir data -ResultsDir results
+.\scripts\run_all.ps1                    # toàn bộ ma trận E1–E5 × 3 seed (đã đặt sẵn cấu hình cũ)
+python analysis/plots.py --data-dir data --results-dir results
+```
+
+Chưa có dataset thì chạy `python prepare/make_synthetic.py` rồi `preprocess_csv.py --train-glob "data/raw/synthetic/01-12/*.csv" --test-glob "data/raw/synthetic/03-11/*.csv"`. Dữ liệu giả chỉ để kiểm tra code chạy được, **không dùng làm kết quả**.
+
+## Lỗi thường gặp
+
+- **F1 = 0,999 ngay từ vòng 1 khi test trên ngày khác**: nghi rò rỉ dữ liệu. Kiểm tra cột định danh và chế độ `--afn`.
+- **`plots.py` báo thiếu cột / sai số lớp**: `--data-dir` không khớp với `--results-dir`, ví dụ mô hình train trên `data_paper` nhưng lại vẽ với `data`.
+- **`UnicodeEncodeError` trên Windows**: đặt `$env:PYTHONIOENCODING="utf-8"`. Các script trong `scripts/` đã đặt sẵn.

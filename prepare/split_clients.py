@@ -77,10 +77,7 @@ def main():
     ap.add_argument("--n-clients", type=int, default=5)
     ap.add_argument("--scenarios", nargs="+", default=["S1", "S2a", "S2b", "S3", "S4"])
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--tag", help="tên thư mục output thay cho tên kịch bản (vd. lab), chỉ dùng với 1 kịch bản")
     a = ap.parse_args()
-    if a.tag and len(a.scenarios) != 1:
-        sys.exit("--tag chỉ dùng với đúng một kịch bản")
     df = pd.read_parquet(paths.TRAIN_POOL)
     labels = df["label"].values
     k = a.n_clients
@@ -92,7 +89,7 @@ def main():
             "S3": lambda: by_attack_split(labels, k, a.seed),
             "S4": lambda: size_skew_split(len(df), k, a.seed),
         }[sc]()
-        d = paths.DATA / (a.tag or sc)
+        d = paths.DATA / sc
         d.mkdir(parents=True, exist_ok=True)
         summary = {}
         for i, idx in enumerate(parts):

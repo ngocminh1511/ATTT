@@ -1,9 +1,11 @@
 """Mục 8.3–8.4: bảng kết quả và các hình cho báo cáo.
 
-Đọc:  results/fl/*.csv (log từng vòng của server), results/baselines.csv, results/per_attack.csv,
-      results/lab_latency.csv (nếu có)
-Ghi:  results/figures/*.png và results/summary.md
-  python analysis/plots.py [--model results/fl/S3_mu0.0_fedavg_seed0_global.pt]
+Đọc:  {results}/fl/*.csv (log từng vòng của server), baselines.csv, per_attack.csv
+Ghi:  {results}/figures/*.png và {results}/summary.md
+  python analysis/plots.py                                              # pipeline paper: data_paper/, results_paper/
+  python analysis/plots.py --data-dir data --results-dir results        # pipeline cũ
+  python analysis/plots.py --model results_paper/fl/paper_resvgg_swin_mu0.0_fedavg_seed0_global.pt
+Với dữ liệu đa lớp có thêm confusion_multiclass.png (hàng = nhãn thật trên test, kể cả lớp chưa gặp lúc train).
 """
 import argparse
 import glob
@@ -21,7 +23,7 @@ from sklearn.metrics import confusion_matrix, roc_curve  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fl_ddos import paths  # noqa: E402
-from fl_ddos.task import method_label  # noqa: E402
+from fl_ddos.task import method_label  # noqa: E402  (các hàm khác của task nạp lười, sau paths.configure)
 
 # Bảng màu categorical cố định (thứ tự không đổi), mực chữ trung tính, lưới nhạt.
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
@@ -33,26 +35,37 @@ plt.rcParams.update({
     "axes.spines.top": False, "axes.spines.right": False, "lines.linewidth": 2,
     "legend.frameon": False, "font.size": 10, "axes.titlesize": 11, "axes.titleweight": "bold",
 })
-FIG = paths.RESULTS / "figures"
+def fig_dir() -> Path:
+    return paths.RESULTS / "figures"
 
 
 def load_fl():
-    files = glob.glob(str(paths.RESULTS / "fl" / "*.csv"))
+    # *_clients.csv là log từng client (cấu trúc khác), không gộp vào đây
+    files = [f for f in glob.glob(str(paths.RESULTS / "fl" / "*.csv")) if not f.endswith("_clients.csv")]
     if not files:
         return pd.DataFrame()
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
     df["poison"] = df["poison"].fillna("").astype(str)
-    df["method"] = [method_label(m, s, p) for m, s, p in zip(df["mu"], df["strategy"], df["poison"])]
+    df["arch"] = df["arch"].fillna("mlp") if "arch" in df.columns else "mlp"
+    df["method"] = [method_label(m, s, p, a) for m, s, p, a in zip(df["mu"], df["strategy"], df["poison"], df["arch"])]
     return df
 
 
 def save(fig, name, tight=True):
-    FIG.mkdir(parents=True, exist_ok=True)
+    fig_dir().mkdir(parents=True, exist_ok=True)
     if tight:
         fig.tight_layout()
-    fig.savefig(FIG / name, dpi=200)
+    fig.savefig(fig_dir() / name, dpi=200)
     plt.close(fig)
-    print(f"  {FIG / name}")
+    print(f"  {fig_dir() / name}")
+
+
+def is_central(m: str) -> bool:
+    return "Centralized" in m
+
+
+def is_local(m: str) -> bool:
+    return "Local-only" in m
 
 
 METHOD_ORDER = ["Local-only", "FedAvg", "FedProx μ=0.01", "FedProx μ=0.1", "Centralized"]
@@ -101,11 +114,13 @@ def fig_bar(fl, base):
         return
     d = pd.concat(rows)
     colors = color_map(set(d.method))
-    central = d[d.method == "Centralized"]["f1"]
-    d = d[d.scenario.isin(["S1", "S3"]) & d.method.isin(METHOD_ORDER[:-1])]
-    order = [m for m in METHOD_ORDER[:-1] if m in set(d.method)]
-    scen = [s for s in ["S1", "S3"] if s in set(d.scenario)]
-    fig, ax = plt.subplots(figsize=(7, 3.6))
+    central = d[d.method.map(is_central)]["f1"]
+    scen = [s for s in ["paper", "S1", "S3"] if s in set(d.scenario)]
+    d = d[d.scenario.isin(scen) & ~d.method.map(is_central)]
+    order = [m for m in colors if m in set(d.method)]
+    if not order:
+        return
+    fig, ax = plt.subplots(figsize=(max(7, 1.2 * len(order) * len(scen)), 3.6))
     width = 0.8 / max(len(order), 1)
     for i, m in enumerate(order):
         x, mean, std = [], [], []
@@ -120,34 +135,72 @@ def fig_bar(fl, base):
         ax.annotate(f"Centralized {central.mean():.3f}", xy=(1, central.mean()), xycoords=("axes fraction", "data"),
                     xytext=(-4, 4), textcoords="offset points", ha="right", color=INK2, fontsize=9)
     ax.set_xticks(range(len(scen))); ax.set_xticklabels(scen); ax.set_ylabel("F1 (vòng cuối)"); ax.set_ylim(0, 1.08)
-    ax.legend(ncol=max(len(order), 1), loc="upper center", bbox_to_anchor=(0.5, -0.1))
+    ax.legend(ncol=min(len(order), 3), loc="upper center", bbox_to_anchor=(0.5, -0.1))
     save(fig, "bar_f1.png")
 
 
+def load_model(model_path):
+    """Đọc .pt mới ({"arch", "dropout", "state_dict"}) hoặc state_dict trần của pipeline cũ (MLP)."""
+    from fl_ddos.task import make_model
+    ckpt = torch.load(model_path, map_location="cpu")
+    if "state_dict" in ckpt:
+        model = make_model(ckpt.get("arch", "mlp"), float(ckpt.get("dropout", 0.3)))
+        model.load_state_dict(ckpt["state_dict"])
+    else:
+        model = make_model("mlp")
+        model.load_state_dict(ckpt)
+    return model
+
+
+def draw_matrix(ax, mat, xlabels, ylabels, fmt):
+    ax.imshow(mat, cmap="Blues", vmin=0, aspect="auto"); ax.grid(False)
+    top = np.nanmax(mat) if mat.size else 1
+    for (i, j), v in np.ndenumerate(mat):
+        ax.text(j, i, fmt(v), ha="center", va="center", fontsize=7 if mat.shape[1] > 4 else 9,
+                color="white" if v > top / 2 else INK)
+    rot = len(xlabels) > 4
+    ax.set_xticks(range(len(xlabels)), xlabels, rotation=45 if rot else 0, ha="right" if rot else "center")
+    ax.set_yticks(range(len(ylabels)), ylabels)
+    ax.set_xlabel("Dự đoán"); ax.set_ylabel("Thực tế")
+
+
 def fig_confusion_roc(model_path):
-    from fl_ddos.task import DDoSNet, load_global_test, predict
-    model = DDoSNet(); model.load_state_dict(torch.load(model_path, map_location="cpu"))
-    y, p, _ = predict(model, load_global_test(), "cpu")
-    cm = confusion_matrix(y, (p >= 0.5).astype(int), labels=[0, 1])
-    fpr, tpr, _ = roc_curve(y, p)
+    from fl_ddos.task import classes, load_global_test, p_attack, predict, test_labels
+    y, P, _ = predict(load_model(model_path), load_global_test(), "cpu")
+    yb, p = (y != 0).astype(int), p_attack(P)
+    cm = confusion_matrix(yb, (p >= 0.5).astype(int), labels=[0, 1])
+    fpr, tpr, _ = roc_curve(yb, p)
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(8, 3.4))
-    a1.imshow(cm, cmap="Blues"); a1.grid(False)
-    for (i, j), v in np.ndenumerate(cm):
-        a1.text(j, i, f"{v:,}", ha="center", va="center", color="white" if v > cm.max() / 2 else INK)
-    a1.set_xticks([0, 1], ["BENIGN", "DDoS"]); a1.set_yticks([0, 1], ["BENIGN", "DDoS"])
-    a1.set_xlabel("Dự đoán"); a1.set_ylabel("Thực tế"); a1.set_title("Ma trận nhầm lẫn")
+    draw_matrix(a1, cm, ["BENIGN", "Tấn công"], ["BENIGN", "Tấn công"], lambda v: f"{v:,}")
+    a1.set_title("Ma trận nhầm lẫn (nhị phân)")
     a2.plot(fpr, tpr, color=SERIES[0]); a2.plot([0, 1], [0, 1], color=GRID, linestyle="--", linewidth=1)
-    a2.set_xlabel("FPR"); a2.set_ylabel("TPR"); a2.set_title("ROC")
+    a2.set_xlabel("FPR"); a2.set_ylabel("TPR"); a2.set_title("ROC (tấn công vs BENIGN)")
     fig.suptitle(Path(model_path).stem, color=INK2, fontsize=9)
     save(fig, "confusion_roc.png")
 
+    cls = classes()
+    if len(cls) <= 2:
+        return
+    # Hàng = nhãn thật trên test (kể cả lớp chưa gặp lúc train, vd. PortScan), cột = lớp dự đoán.
+    # Chuẩn hóa theo hàng: ô (i, j) = tỉ lệ mẫu loại i bị gán thành lớp j.
+    truth, pred = test_labels(), np.array(cls)[P.argmax(1)]
+    rows = [c for c in cls if c in set(truth)] + sorted(set(truth) - set(cls))
+    mat = pd.crosstab(pd.Categorical(truth, rows), pd.Categorical(pred, cls), normalize="index", dropna=False)
+    fig, ax = plt.subplots(figsize=(0.55 * len(cls) + 2.5, 0.45 * len(rows) + 1.6))
+    draw_matrix(ax, mat.values, cls, [f"{r} ({(truth == r).sum():,})" for r in rows],
+                lambda v: f"{v:.2f}" if v >= 0.005 else "")
+    ax.set_title("Ma trận nhầm lẫn đa lớp (chuẩn hóa theo hàng)")
+    fig.suptitle(Path(model_path).stem, color=INK2, fontsize=9)
+    save(fig, "confusion_multiclass.png")
+
 
 def fig_heatmap(pa, scenario="S3"):
-    sub = pa[(pa.scenario == scenario) & (pa.method != "Centralized")]
+    sub = pa[(pa.scenario == scenario) & ~pa.method.map(is_central)]
     if sub.empty:
         return
     attack_cols = [c for c in sub.columns if c not in ("method", "scenario", "client", "seed") and c != "BENIGN"]
-    sub = sub.assign(row=np.where(sub.method == "Local-only", "Local client " + sub.client.astype(str), sub.method))
+    sub = sub.assign(row=np.where(sub.method.map(is_local), sub.method + " · client " + sub.client.astype(str),
+                                  sub.method))
     mat = sub.groupby("row")[attack_cols].mean()
     fig, ax = plt.subplots(figsize=(0.7 * len(attack_cols) + 2.5, 0.45 * len(mat) + 1.2))
     im = ax.imshow(mat.values, cmap="Blues", vmin=0, vmax=1, aspect="auto"); ax.grid(False)
@@ -156,46 +209,32 @@ def fig_heatmap(pa, scenario="S3"):
             ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7, color="white" if v > 0.6 else INK)
     ax.set_xticks(range(len(attack_cols)), attack_cols, rotation=45, ha="right")
     ax.set_yticks(range(len(mat)), mat.index)
-    ax.set_title(f"Recall theo loại tấn công ({scenario})")
+    ax.set_title(f"Tỉ lệ phát hiện theo loại tấn công ({scenario})")
     fig.colorbar(im, ax=ax, fraction=0.03)
     save(fig, f"heatmap_recall_{scenario}.png")
 
 
-def fig_latency():
-    f = paths.RESULTS / "lab_latency.csv"
-    if not f.exists():
-        return
-    d = pd.read_csv(f).dropna(subset=["latency_s"])
-    methods = list(d.method.unique())
-    fig, ax = plt.subplots(figsize=(6, 3.2))
-    bp = ax.boxplot([d[d.method == m]["latency_s"] for m in methods], patch_artist=True)
-    ax.set_xticks(range(1, len(methods) + 1), methods)
-    for i, b in enumerate(bp["boxes"]):
-        b.set(facecolor=SERIES[i], alpha=0.6, edgecolor=INK2)
-    ax.set_ylabel("Độ trễ phát hiện (giây)")
-    save(fig, "latency_boxplot.png")
-
-
 def summary(fl, base, pa):
-    # F1/Recall/FPR/AUC lấy ở vòng cuối; "F1 tốt nhất (vòng)" cho thấy mô hình có bị suy giảm về cuối không.
-    lines = ["| Phương pháp | Kịch bản | F1 | Recall | FPR | AUC | F1 tốt nhất (vòng) | Vòng để F1 ≥ 0,95 "
-             "| MB truyền | Recall SYN | Recall PortScan |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+    # F1/Recall/FPR/AUC (phát hiện nhị phân) lấy ở vòng cuối; MSI/F1-macro là metric đa lớp của paper.
+    # "F1 tốt nhất (vòng)" cho thấy mô hình có bị suy giảm về cuối không.
+    lines = ["| Phương pháp | Kịch bản | F1 | Recall | FPR (FAR) | AUC | MSI | F1-macro | F1 tốt nhất (vòng) "
+             "| Vòng để F1 ≥ 0,95 | MB truyền | Recall SYN | Recall PortScan |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     fmt = lambda s: f"{s.mean():.4f} ± {s.std():.4f}" if len(s) > 1 else f"{s.mean():.4f}"  # noqa: E731
 
-    def attack(method, sc, col):
-        if pa.empty or col not in pa.columns:
+    def col(g, c):
+        return fmt(g[c].dropna()) if c in g.columns and g[c].notna().any() else "—"
+
+    def attack(method, sc, c):
+        if pa.empty or c not in pa.columns:
             return "—"
         sel = pa[(pa.method == method) & (pa.scenario == sc)]
-        if method == "Local-only":
-            sel = sel.groupby("seed")[col].mean()  # TB các client trong mỗi seed
-        else:
-            sel = sel[col]
+        sel = (sel.groupby("seed")[c].mean() if is_local(method) else sel[c]).dropna()  # Local-only: TB client mỗi seed
         return fmt(sel) if len(sel) else "—"
     if not base.empty:
         for (m, sc), g in base[base.client.astype(str).isin(["all", "mean"])].groupby(["method", "scenario"]):
-            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | — | — | — "
-                         f"| {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
+            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
+                         f"| {col(g, 'f1_macro')} | — | — | — | {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
     if not fl.empty:
         last = final_round(fl)
         for (m, sc), g in last.groupby(["method", "scenario"]):
@@ -204,8 +243,9 @@ def summary(fl, base, pa):
             r = f"{reach.mean():.1f}" if len(reach) else "chưa đạt"
             best = full.loc[full.groupby("seed")["f1"].idxmax()]
             b = f"{best.f1.mean():.4f} ({best['round'].mean():.0f})"
-            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {b} | {r} | "
-                         f"{g.comm_MB.mean():.2f} | {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
+            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
+                         f"| {col(g, 'f1_macro')} | {b} | {r} | {g.comm_MB.mean():.2f} "
+                         f"| {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
     out = paths.RESULTS / "summary.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
@@ -214,8 +254,11 @@ def summary(fl, base, pa):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--data-dir", default=str(paths.ROOT / "data_paper"))
+    ap.add_argument("--results-dir", default=str(paths.ROOT / "results_paper"))
     ap.add_argument("--model", help="global.pt dùng cho ma trận nhầm lẫn + ROC (mặc định: file mới nhất)")
     a = ap.parse_args()
+    paths.configure(a.data_dir, a.results_dir)
     fl = load_fl()
     base = pd.read_csv(paths.RESULTS / "baselines.csv") if (paths.RESULTS / "baselines.csv").exists() else pd.DataFrame()
     pa = pd.read_csv(paths.RESULTS / "per_attack.csv") if (paths.RESULTS / "per_attack.csv").exists() else pd.DataFrame()
@@ -228,7 +271,6 @@ def main():
     if not pa.empty:
         for sc in sorted(pa.scenario.unique()):
             fig_heatmap(pa, sc)
-    fig_latency()
     summary(fl, base, pa)
 
 
