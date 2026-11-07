@@ -1,0 +1,2 @@
+method,scenario,client,seed,BENIGN,DNS,LDAP,MSSQL,NTP,NetBIOS,SNMP,SYN,TFTP,UDP,UDP-Lag,WebDDoS
+ResVGG-SwinNet · FedAvg,paper,global,0,0.0030152708880459,1.0,1.0,1.0,0.9995,1.0,1.0,1.0,1.0,1.0,0.99943661971831,1.0

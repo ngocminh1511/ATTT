@@ -14,7 +14,7 @@ Pipeline cũ (FL + Suricata, mô tả trong file `.docx` ở `docs/`) đã bỏ 
 |---|---|---|
 | `fl_ddos/paper_prep.py` | 3.2–3.6 | AFN, TEC, CTA, DPCA (WIS + FBSA), MTB, DAS (CRA + IDF), NDS/JAA, DRA, LIS. Bước nào cần thống kê toàn cục thì client chỉ gửi tổng, server gộp |
 | `prepare/paper_pipeline.py` | 3.2–3.6, Eq.13 | CIC-DDoS2019 → `data_paper/` (3 client, đa lớp) |
-| `fl_ddos/models.py` | 3.7, Bảng 12 | ResVGG-SwinNet, các biến thể ablation (`resnet`, `resnet_vgg`, `resnet_swin`), baseline `mlp`, `lstm`, `lstm_gru` |
+| `fl_ddos/models.py` | 3.7, Bảng 12 | ResVGG-SwinNet, các biến thể ablation (`resnet`, `resnet_vgg`, `resnet_swin`), baseline `lstm`, `lstm_gru`; MLP dành cho pipeline cũ |
 | `fl_ddos/task.py` | 4 | Nạp dữ liệu, train (class weight MTB, FedProx), metric: F1/Recall/FAR/AUC (nhị phân) + MSI, F1-macro, Log Loss, AUC-OvR (đa lớp) |
 | `fl_ddos/client_app.py` / `server_app.py` | 3.7.2, Bảng 6, 8 | Flower ClientApp/ServerApp (Flower 1.40), FedAvg hoặc FedTrimmedAvg. Ghi thời gian, bộ nhớ, ‖Δw‖ của từng client |
 | `baselines/` | — | Centralized (cận trên), Local-only (cận dưới), chọn được kiến trúc |
@@ -103,7 +103,7 @@ Mặc định trong `pyproject.toml` lấy theo paper mục 5.1: 30 vòng, 5 epo
 .\scripts\fl_run.ps1 "" -Actors 1 -Gpus 1                                  # ResVGG-SwinNet, 3 client, 30 vòng
 .\scripts\fl_run.ps1 "num-server-rounds=2 local-epochs=1" -Actors 1 -Gpus 1  # chạy thử nhanh
 .\scripts\fl_run.ps1 "arch='resnet'" -Actors 1 -Gpus 1                     # ablation: resnet | resnet_vgg | resnet_swin
-.\scripts\fl_run.ps1 "arch='lstm'" -Actors 1 -Gpus 1                       # baseline: mlp | lstm | lstm_gru
+.\scripts\fl_run.ps1 "arch='lstm'" -Actors 1 -Gpus 1                       # baseline: lstm | lstm_gru
 .\scripts\fl_run.ps1 "tag-suffix='_random'" -DataDir data_paper_random -ResultsDir results_paper -Actors 1 -Gpus 1
 
 $env:FL_DDOS_DATA = "$PWD\data_paper"; $env:FL_DDOS_RESULTS = "$PWD\results_paper"
@@ -123,6 +123,41 @@ Kết quả nằm trong `results_paper/fl/`:
 Ngoài ra có `results_paper/per_attack.csv` (tỉ lệ bị gắn là tấn công theo từng loại) và `per_class.csv` (recall đúng loại tấn công).
 
 FedProx (`proximal-mu`), FedTrimmedAvg (`strategy='trimmed'`) và đầu độc nhãn (`poison-clients`) vẫn có, nhưng paper chỉ dùng FedAvg.
+
+### Chạy trên Modal (tắt máy vẫn chạy)
+
+`modal_app.py` đẩy toàn bộ thí nghiệm lên GPU đám mây của Modal. Bộ điều phối cũng chạy trên Modal, nên với `--detach` có thể tắt máy. Mỗi thí nghiệm là một container GPU L4 riêng (3 client dùng chung một GPU), tối đa 8 container chạy song song. Kết quả nằm trong Volume `fl-ddos`.
+
+```powershell
+# một lần đầu
+modal volume create fl-ddos
+modal volume put fl-ddos data/raw/cicddos2019 /raw/cicddos2019
+
+modal run modal_app.py --quick           # thử 2 vòng × 1 epoch (resvgg_swin + lstm): chạy trước để chắc không lỗi
+modal run --detach modal_app.py          # chạy đầy đủ rồi tắt máy
+modal volume get fl-ddos /results/full ./results_modal   # sáng dậy lấy kết quả
+```
+
+Bản đầy đủ mặc định gồm:
+- 6 kiến trúc × 3 seed trên `main` (không có baseline MLP).
+- ResVGG-SwinNet trên `random` (chia như paper) và `leak` (AFN theo nhãn).
+- Centralized và Local-only.
+
+Tổng cộng 22 thí nghiệm. Thu hẹp lại bằng `--seeds 0 --archs resvgg_swin,resnet --variants main --no-baselines`. `results_modal/full/status.json` ghi thí nghiệm nào lỗi; log từng container xem ở https://modal.com/apps. Nếu cần gộp và vẽ lại mà không train: `modal run modal_app.py::report`.
+
+### Xem kết quả đã chạy
+
+Kết quả đầy đủ được lưu trong Git tại [`results_modal/full/`](results_modal/full/), gồm báo cáo, biểu đồ trong `figures/`, metric CSV và trọng số mô hình `.pt`. Có thể xem trực tiếp các báo cáo dưới đây mà không cần tải dataset hoặc chạy train:
+
+| Biến thể | Cấu hình | Báo cáo |
+|---|---|---|
+| `main` | AFN theo protocol; train/test khác ngày | [Kết quả chính](results_modal/full/main/summary.md) |
+| `random` | AFN theo protocol; chia ngẫu nhiên 80/20 trong cùng ngày | [Kết quả chia cùng ngày](results_modal/full/random/summary.md) |
+| `leak` | AFN theo nhãn, dùng nhãn thật của test để chọn nhóm chuẩn hóa; train/test khác ngày | [Kết quả minh họa rò rỉ nhãn](results_modal/full/leak/summary.md) |
+
+Cột F1 trong báo cáo đánh giá phát hiện nhị phân BENIGN/attack; F1-macro đánh giá phân loại đa lớp. [`status.json`](results_modal/full/status.json) ghi trạng thái và thời gian của 22 thí nghiệm. [Tài liệu pipeline hiện tại](docs/pipeline_hien_tai.md) giải thích các bước xử lý và huấn luyện.
+
+Dữ liệu gốc `data/raw/cicddos2019/`, dữ liệu đã xử lý `data_paper*/`, môi trường ảo, log và các lượt chạy thử được bỏ qua trong `.gitignore`.
 
 ## 4. Phân tích
 
@@ -148,14 +183,13 @@ Mở bằng kernel **Python (fl-ddos)**: `pip install -e .[notebook]` rồi `pyt
 
 ## 6. Pipeline cũ (MLP nhị phân, S1–S4)
 
-Giữ lại để so sánh FedAvg/FedProx dưới các kiểu Non-IID. Dữ liệu ở `data/`, kết quả ở `results/`, 5 client.
+Mã hỗ trợ MLP với 5 client vẫn được giữ để tham khảo. Dữ liệu đã chia S1–S4, dữ liệu giả lập, kết quả `results/` và hai script `run_all.*` đã được dọn. Muốn chạy lại luồng cũ cần tạo lại dữ liệu; các lệnh dưới đây mô tả cách thực hiện từng bước:
 
 ```powershell
 python prepare/preprocess_csv.py --train-glob "data/raw/cicddos2019/*-testing.parquet" --test-glob "data/raw/cicddos2019/*-training.parquet"
 python prepare/split_clients.py          # data/S1 S2a S2b S3 S4/client_1..5.parquet
 python prepare/federated_scaler.py       # data/scaler.json
 .\scripts\fl_run.ps1 "scenario='S3' arch='mlp' local-epochs=2 batch-size=256 dropout=0.2" -Clients 5 -DataDir data -ResultsDir results
-.\scripts\run_all.ps1                    # toàn bộ ma trận E1–E5 × 3 seed (đã đặt sẵn cấu hình cũ)
 python analysis/plots.py --data-dir data --results-dir results
 ```
 

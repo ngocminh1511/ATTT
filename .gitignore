@@ -1,10 +1,18 @@
+# Local environment and Python caches
 .venv/
 __pycache__/
 *.egg-info/
-data/
-!data/.gitkeep
-results/
+
+# Local datasets, logs, and generated experiment output
+/data/
+/data_paper*/
+/results/
+/results_*/
+/logs/
 *.pt
-logs/
-data_paper*/
-results_*/
+
+# Share completed Modal results, including model checkpoints
+!/results_modal/
+/results_modal/*
+!/results_modal/full/
+!/results_modal/full/**

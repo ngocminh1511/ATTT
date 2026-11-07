@@ -2,7 +2,7 @@
 
   resvgg_swin   ResVGG-SwinNet (paper mục 3.7): ResNet block -> VGG block -> Swin-Transformer -> softmax
   resnet, resnet_vgg, resnet_swin   các biến thể ablation (paper Bảng 12)
-  mlp           DDoSNet (MLP nhỏ của pipeline cũ, làm baseline)
+  mlp           DDoSNet (MLP chỉ dành cho pipeline cũ S1–S4)
   lstm, lstm_gru   baseline FL-LSTM [12] và Hybrid LSTM-GRU [17]
 
 Dữ liệu là vector đặc trưng flow, không phải ảnh. Paper không nói cách đưa vào CNN, nên ở đây

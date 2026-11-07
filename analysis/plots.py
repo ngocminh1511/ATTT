@@ -26,7 +26,8 @@ from fl_ddos import paths  # noqa: E402
 from fl_ddos.task import method_label  # noqa: E402  (các hàm khác của task nạp lười, sau paths.configure)
 
 # Bảng màu categorical cố định (thứ tự không đổi), mực chữ trung tính, lưới nhạt.
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948",
+          "#777777", "#8c564b"]
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 plt.rcParams.update({
     "figure.facecolor": "white", "axes.facecolor": "white", "axes.edgecolor": GRID,
@@ -71,10 +72,18 @@ def is_local(m: str) -> bool:
 METHOD_ORDER = ["Local-only", "FedAvg", "FedProx μ=0.01", "FedProx μ=0.1", "Centralized"]
 
 
+def display_method(method: str) -> str:
+    """Log cũ lược tên MLP; luôn ghi cả mô hình và cách học khi trình bày."""
+    return method if " · " in method else f"MLP · {method}"
+
+
 def color_map(methods) -> dict:
     """Màu đi theo phương pháp (không theo thứ hạng/panel): cố định thứ tự, không quay vòng."""
     ordered = [m for m in METHOD_ORDER if m in methods] + sorted(set(methods) - set(METHOD_ORDER))
-    return {m: SERIES[i] for i, m in enumerate(ordered[:len(SERIES)])}
+    palette = SERIES if len(ordered) <= len(SERIES) else [
+        matplotlib.colors.to_hex(c) for c in matplotlib.colormaps["tab20"].resampled(len(ordered))(range(len(ordered)))
+    ]
+    return dict(zip(ordered, palette))
 
 
 def fig_f1_vs_round(fl):
@@ -91,9 +100,10 @@ def fig_f1_vs_round(fl):
                             color=colors[m], alpha=0.15, linewidth=0)
         ax.set_title(sc); ax.set_xlabel("Vòng FL")
         ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
-    axes[0][0].set_ylabel("F1 trên test ngày 2")
+    axes[0][0].set_ylabel("F1 nhị phân trên test")
     handles = [plt.Line2D([], [], color=c, lw=2) for c in colors.values()]
-    fig.legend(handles, list(colors), loc="lower center", ncol=min(len(colors), 4), bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles, [display_method(m) for m in colors], loc="lower center", ncol=min(len(colors), 4),
+               bbox_to_anchor=(0.5, -0.02))
     fig.tight_layout(rect=(0, 0.1 if len(colors) <= 4 else 0.16, 1, 1))
     save(fig, "f1_vs_round.png", tight=False)
 
@@ -114,7 +124,7 @@ def fig_bar(fl, base):
         return
     d = pd.concat(rows)
     colors = color_map(set(d.method))
-    central = d[d.method.map(is_central)]["f1"]
+    central = d[d.method.map(is_central)]
     scen = [s for s in ["paper", "S1", "S3"] if s in set(d.scenario)]
     d = d[d.scenario.isin(scen) & ~d.method.map(is_central)]
     order = [m for m in colors if m in set(d.method)]
@@ -129,12 +139,12 @@ def fig_bar(fl, base):
             if len(g):
                 x.append(j + (i - (len(order) - 1) / 2) * width)
                 mean.append(g.mean()); std.append(g.std() if len(g) > 1 else 0)
-        ax.bar(x, mean, width - 0.02, yerr=std, color=colors[m], label=m, error_kw={"ecolor": INK2, "lw": 1})
-    if len(central):  # cận trên: đường tham chiếu, không phải một cột nữa
-        ax.axhline(central.mean(), color=INK2, linestyle="--", linewidth=1.2)
-        ax.annotate(f"Centralized {central.mean():.3f}", xy=(1, central.mean()), xycoords=("axes fraction", "data"),
-                    xytext=(-4, 4), textcoords="offset points", ha="right", color=INK2, fontsize=9)
-    ax.set_xticks(range(len(scen))); ax.set_xticklabels(scen); ax.set_ylabel("F1 (vòng cuối)"); ax.set_ylim(0, 1.08)
+        ax.bar(x, mean, width - 0.02, yerr=std, color=colors[m], label=display_method(m),
+               error_kw={"ecolor": INK2, "lw": 1})
+    for m, g in central.groupby("method"):  # baseline thực nghiệm, không bảo đảm là cận trên
+        ax.axhline(g.f1.mean(), color=INK2, linestyle="--", linewidth=1.2,
+                   label=f"{display_method(m)} ({g.f1.mean():.3f})")
+    ax.set_xticks(range(len(scen))); ax.set_xticklabels(scen); ax.set_ylabel("F1 nhị phân trên test"); ax.set_ylim(0, 1.08)
     ax.legend(ncol=min(len(order), 3), loc="upper center", bbox_to_anchor=(0.5, -0.1))
     save(fig, "bar_f1.png")
 
@@ -208,7 +218,7 @@ def fig_heatmap(pa, scenario="S3"):
         if not np.isnan(v):
             ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7, color="white" if v > 0.6 else INK)
     ax.set_xticks(range(len(attack_cols)), attack_cols, rotation=45, ha="right")
-    ax.set_yticks(range(len(mat)), mat.index)
+    ax.set_yticks(range(len(mat)), [display_method(m) for m in mat.index])
     ax.set_title(f"Tỉ lệ phát hiện theo loại tấn công ({scenario})")
     fig.colorbar(im, ax=ax, fraction=0.03)
     save(fig, f"heatmap_recall_{scenario}.png")
@@ -233,7 +243,7 @@ def summary(fl, base, pa):
         return fmt(sel) if len(sel) else "—"
     if not base.empty:
         for (m, sc), g in base[base.client.astype(str).isin(["all", "mean"])].groupby(["method", "scenario"]):
-            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
+            lines.append(f"| {display_method(m)} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
                          f"| {col(g, 'f1_macro')} | — | — | — | {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
     if not fl.empty:
         last = final_round(fl)
@@ -243,7 +253,7 @@ def summary(fl, base, pa):
             r = f"{reach.mean():.1f}" if len(reach) else "chưa đạt"
             best = full.loc[full.groupby("seed")["f1"].idxmax()]
             b = f"{best.f1.mean():.4f} ({best['round'].mean():.0f})"
-            lines.append(f"| {m} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
+            lines.append(f"| {display_method(m)} | {sc} | {fmt(g.f1)} | {fmt(g.recall)} | {fmt(g.fpr)} | {fmt(g.auc)} | {col(g, 'msi')} "
                          f"| {col(g, 'f1_macro')} | {b} | {r} | {g.comm_MB.mean():.2f} "
                          f"| {attack(m, sc, 'SYN')} | {attack(m, sc, 'PortScan')} |")
     out = paths.RESULTS / "summary.md"
