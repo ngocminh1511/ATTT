@@ -17,7 +17,8 @@ from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg, FedTrimmedAvg
 
 from fl_ddos import paths
-from fl_ddos.task import (classes, load_global_test, make_model, method_label, metrics, p_attack,
+from fl_ddos.multidataset_server import run_multidataset
+from fl_ddos.task import (classes, is_multi, load_global_test, make_model, method_label, metrics, p_attack,
                           per_attack_recall, per_class_recall, predict, set_seed, test_labels)
 
 app = ServerApp()
@@ -70,7 +71,9 @@ def make_evaluate_fn(test, n_params, n_clients, arch, dropout):
 def main(grid: Grid, context: Context) -> None:
     rc = context.run_config
     paths.configure(str(rc.get("data-dir", "")), str(rc.get("results-dir", "")))
-    seed, mu, sc = int(rc["seed"]), float(rc["proximal-mu"]), str(rc["scenario"])
+    if is_multi():  # 3 client × 3 nguồn: chọn checkpoint bằng validation, không đánh giá test trong lúc train
+        return run_multidataset(grid, context)
+    seed, mu, sc =int(rc["seed"]), float(rc["proximal-mu"]), str(rc["scenario"])
     strategy_name, poison = str(rc["strategy"]), str(rc.get("poison-clients", ""))
     n_clients = int(rc["num-clients"])
     arch, dropout = str(rc.get("arch", "mlp")), float(rc.get("dropout", 0.3))

@@ -31,3 +31,12 @@ def configure(data_dir: str = "", results_dir: str = "") -> None:
 def client_file(scenario: str, pid: int) -> Path:
     """pid bắt đầu từ 0 (partition-id của Flower), file đặt tên client_1..K."""
     return DATA / scenario / f"client_{pid + 1}.parquet"
+
+
+def val_file(scenario: str, pid: int) -> Path:
+    """Validation chia sẵn của pipeline multidataset_v1: val_client_1..3.parquet."""
+    return DATA / scenario / f"val_client_{pid + 1}.parquet"
+
+
+def multi_test_file(dataset_id: str) -> Path:
+    return DATA / "test" / f"{dataset_id}.parquet"

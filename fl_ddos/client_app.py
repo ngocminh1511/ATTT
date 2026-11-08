@@ -10,7 +10,8 @@ from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
 from fl_ddos import paths
-from fl_ddos.task import evaluate as eval_fn, load_local, make_model, mtb_weights, set_seed, train as train_fn
+from fl_ddos.task import (classes, evaluate as eval_fn, load_local, make_model, mtb_weights, set_seed,
+                          train as train_fn)
 
 app = ClientApp()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,6 +45,7 @@ def train(msg: Message, context: Context):
         "metrics": MetricRecord({
             "train_loss": loss, "num-examples": len(trainloader.dataset), "partition-id": pid,
             "train_time_s": elapsed, "update_norm": float((w1 - w0.cpu()).norm()),
+            "server-round": int(msg.content["config"].get("server-round", -1)),
             "peak_mem_MB": torch.cuda.max_memory_allocated() / 2**20 if DEVICE.type == "cuda" else 0.0}),
     })
     return Message(content=reply, reply_to=msg)
@@ -54,7 +56,11 @@ def evaluate(msg: Message, context: Context):
     rc, pid, model = _setup(msg, context)
     _, valloader = load_local(pid, rc["scenario"], rc["batch-size"], int(rc["seed"]))
     m = eval_fn(model, valloader, DEVICE)
-    metrics = MetricRecord({"eval_f1": m["f1"], "eval_acc": m["acc"], "eval_recall": m["recall"],
-                            "eval_f1_macro": m["f1_macro"], "eval_msi": m["msi"],
-                            "partition-id": pid, "num-examples": len(valloader.dataset)})
+    rec = {"eval_f1": m["f1"], "eval_acc": m["acc"], "eval_recall": m["recall"],
+           "eval_f1_macro": m["f1_macro"], "eval_msi": m["msi"], "eval_f1_macro_present": m["f1_macro_present"],
+           "partition-id": pid, "num-examples": len(valloader.dataset),
+           "server-round": int(msg.content["config"].get("server-round", -1))}
+    y = valloader.dataset.tensors[1]
+    rec.update({f"eval_support_{c}": int((y == c).sum()) for c in range(len(classes()))})
+    metrics = MetricRecord(rec)
     return Message(content=RecordDict({"metrics": metrics}), reply_to=msg)

@@ -4,7 +4,9 @@ Hai loại dữ liệu, phân biệt bằng features.json:
   - pipeline cũ (data/): cột đặc trưng ĐÃ slog1p, chuẩn hóa bằng scaler.json khi tạo tensor; nhãn "binary".
   - pipeline paper (data_paper/, prepare/paper_pipeline.py): đặc trưng đã qua AFN…LIS, dùng nguyên;
     nhãn đa lớp "y" theo meta["classes"] (lớp 0 = BENIGN; −100 = lớp chưa gặp lúc train, bỏ qua trong loss).
-Cả hai đều có cột "label" (tên loại) và "binary" (0/1) cho metric phát hiện nhị phân.
+  - pipeline multidataset_v1 (data_paper_multi/, prepare/multidataset_pipeline.py): 3 client × 3 lớp,
+    đặc trưng đã qua log1p + AFN, dùng nguyên; validation đã chia sẵn (val_client_k.parquet) TRƯỚC mọi bước fit.
+Cả ba đều có cột "label" (tên loại) và "binary" (0/1) cho metric phát hiện nhị phân.
 """
 import json
 from functools import lru_cache
@@ -24,9 +26,15 @@ from fl_ddos.models import ARCH_NAMES, DDoSNet, build_model  # noqa: F401  (DDoS
 IGNORE = -100
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=8)
+def _meta_at(path: str, mtime: float) -> dict:
+    return load_meta(path)
+
+
 def meta() -> dict:
-    return load_meta()
+    """features.json của thư mục data hiện tại; cache theo (đường dẫn, mtime) nên đổi data-dir không dùng nhầm schema."""
+    f = paths.FEATURES_JSON
+    return _meta_at(str(f), f.stat().st_mtime if f.exists() else 0.0)
 
 
 def features() -> list:
@@ -41,9 +49,26 @@ def is_paper() -> bool:
     return meta().get("pipeline") == "paper"
 
 
-@lru_cache(maxsize=1)
+MULTI = "multidataset_v1"
+
+
+def is_multi() -> bool:
+    return meta().get("pipeline") == MULTI
+
+
+def uses_scaler() -> bool:
+    """Chỉ pipeline MLP cũ (data/) chuẩn hóa bằng scaler.json lúc tạo tensor."""
+    return meta().get("pipeline") not in ("paper", MULTI)
+
+
+@lru_cache(maxsize=8)
+def _scaler_at(path: str, mtime: float):
+    return load_scaler(path)
+
+
 def scaler():
-    return load_scaler()
+    f = paths.SCALER_JSON
+    return _scaler_at(str(f), f.stat().st_mtime if f.exists() else 0.0)
 
 
 def make_model(arch: str = "mlp", dropout: float = 0.3) -> nn.Module:
@@ -52,7 +77,7 @@ def make_model(arch: str = "mlp", dropout: float = 0.3) -> nn.Module:
 
 def to_tensor(df: pd.DataFrame, flip_labels: bool = False) -> TensorDataset:
     x = df[features()].values.astype(np.float64)
-    if not is_paper():
+    if uses_scaler():
         mean, std = scaler()
         x = standardize(x, mean, std)
     y = df["y" if "y" in df.columns else "binary"].values.astype(np.int64)
@@ -66,18 +91,32 @@ def read_local(pid: int, scenario: str) -> pd.DataFrame:
 
 
 def load_local(pid: int, scenario: str, batch: int, seed: int = 0, poison: bool = False):
-    df = read_local(pid, scenario)
-    val = df.sample(frac=0.1, random_state=seed)
-    tr = df.drop(val.index)
+    if is_multi():  # validation đã chia theo nhóm trước mọi bước fit, không tách lại từ file train
+        tr, val = read_local(pid, scenario), pd.read_parquet(paths.val_file(scenario, pid))
+    else:
+        df = read_local(pid, scenario)
+        val = df.sample(frac=0.1, random_state=seed)
+        tr = df.drop(val.index)
     g = torch.Generator().manual_seed(seed + pid)
     return (DataLoader(to_tensor(tr, poison), batch_size=batch, shuffle=True, generator=g),
             DataLoader(to_tensor(val), batch_size=1024))
 
 
+def _read_json(path):
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 def mtb_weights(pid: int, scenario: str):
-    """Class weight MTB (Eq.3) do paper_pipeline.py tính sẵn cho client; None nếu không có."""
-    f = paths.DATA / scenario / "mtb_weights.json"
-    return json.load(open(f))[f"client_{pid + 1}"] if f.exists() else None
+    """Class weight do pipeline tính sẵn cho client: MTB (Eq.3) của paper_pipeline.py, hoặc
+    class_weights.json (nghịch đảo tần suất, lớp vắng = 0) của multidataset_v1; None nếu không có."""
+    for name in ("class_weights.json", "mtb_weights.json"):
+        f = paths.DATA / scenario / name
+        if f.exists():
+            return _read_json(f)[f"client_{pid + 1}"]
+    if is_multi():
+        raise FileNotFoundError(f"Thiếu {paths.DATA / scenario / 'class_weights.json'}")
+    return None
 
 
 def load_global_test(batch: int = 4096) -> DataLoader:
@@ -154,7 +193,8 @@ def metrics(y, P, loss=float("nan"), thresh=0.5) -> dict:
     aucs = [roc_auc_score(yk == c, Pk[:, c]) for c in present if 0 < (yk == c).sum() < len(yk)]
     out.update({"acc": float((pk == yk).mean()) if len(yk) else 0.0,
                 "msi": float(rec_c.mean()) if len(present) else 0.0,
-                "f1_macro": float(f1_c.mean()) if len(present) else 0.0,
+                "f1_macro": float(f1_c.mean()) if len(present) else 0.0,  # = F1-macro-present
+                "f1_macro_present": float(f1_c.mean()) if len(present) else float("nan"),
                 "log_loss": float(log_loss(yk, np.clip(Pk, 1e-7, 1), labels=range(P.shape[1]))) if len(yk) else 0.0,
                 "auc_ovr": float(np.mean(aucs)) if aucs else 0.0})
     return out

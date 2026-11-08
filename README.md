@@ -4,7 +4,7 @@ Cài đặt lại phương pháp của bài báo trong `docs/futureinternet-17-0
 
 > Alshdadi et al., *Federated Deep Learning for Scalable and Privacy-Preserving DDoS Attack Detection in IoT Networks*, Future Internet 2025, 17, 88.
 
-Mỗi client train mô hình ResVGG-SwinNet trên dữ liệu của mình và chỉ gửi trọng số về server, server gộp bằng FedAvg. Dữ liệu được tiền xử lý theo đúng chuỗi bước của paper (AFN, CTA, MTB, DPCA, DAS, FDP, FRP). Hiện tại mới làm trên **CIC-DDoS2019**. UNSW-NB15 và IoT-23 làm sau.
+Mỗi client train mô hình ResVGG-SwinNet trên dữ liệu của mình và chỉ gửi trọng số về server, server gộp bằng FedAvg. Dữ liệu được tiền xử lý theo đúng chuỗi bước của paper (AFN, CTA, MTB, DPCA, DAS, FDP, FRP). Pipeline gốc làm trên **CIC-DDoS2019**. Phần mở rộng **multidataset_v1** (mục 7) chạy FL với 3 client, mỗi client một dataset (CIC-DDoS2019 / UNSW-NB15 / IoT-23), 3 lớp BENIGN / DOS_DDOS / OTHER_ATTACK.
 
 Pipeline cũ (FL + Suricata, mô tả trong file `.docx` ở `docs/`) đã bỏ phần Suricata. Phần FL nhị phân với MLP và các kịch bản S1–S4 vẫn giữ lại để so sánh (mục 6).
 
@@ -22,6 +22,13 @@ Pipeline cũ (FL + Suricata, mô tả trong file `.docx` ở `docs/`) đã bỏ 
 | `fl_ddos/features.py` | — | `slog1p`, đọc `features.json`/`scaler.json`, chuẩn hóa tên nhãn CIC |
 | `prepare/preprocess_csv.py`, `split_clients.py`, `federated_scaler.py`, `make_synthetic.py` | — | Pipeline cũ (mục 6) |
 | `scripts/` | — | `fl_run.*` (bọc `flwr run`), `run_all.*` (ma trận cũ E1–E5) |
+| `configs/multidataset.json` | — | multidataset_v1: nguồn tải, bảng nhãn, profile smoke/main, split, AFN, DAS |
+| `fl_ddos/dataset_adapters.py` | — | Parser CIC Parquet / UNSW CSV / IoT-23 `conn.log.labeled` (đọc tar.gz theo luồng), nhãn 3 lớp, schema 4 trường |
+| `fl_ddos/multidataset_prep.py` | 3.2, 3.5 | Reservoir, split theo nhóm, quota, log1p + AFN có missing, DAS pooled, transform, artifacts |
+| `fl_ddos/multidataset_server.py`, `multidataset_eval.py` | — | FedAvg 3 nguồn, chọn best bằng validation; đánh giá một checkpoint trên 3 test |
+| `prepare/download_datasets.py`, `prepare/multidataset_pipeline.py` | — | Tải/kiểm tra raw; CLI pipeline |
+| `analysis/evaluate_multidataset.py`, `baselines/multidataset_baselines.py`, `scripts/run_multidataset.ps1` | — | Đánh giá, baseline local/centralized, ma trận thí nghiệm |
+| `tests/` | — | Kiểm thử bằng fixture nhỏ: `python -m unittest discover -s tests` |
 
 ## 1. Môi trường
 
@@ -178,6 +185,7 @@ Chưa làm: kiểm định thống kê (paper Bảng 11), phân tích độ nh�
 |---|---|
 | `notebooks/01_hieu_dataset.ipynb` | Giải thích CIC-DDoS2019: flow, từng loại tấn công, ý nghĩa đặc trưng, mất cân bằng, khác biệt giữa hai ngày, cách chia client S1–S4 |
 | `notebooks/02_phan_tich_ket_qua.ipynb` | Đọc kết quả E1–E7 của **pipeline cũ** (`results/`) |
+| `notebooks/03_tien_xu_ly_ba_dataset.ipynb` | multidataset_v1: nguồn, ánh xạ nhãn/đặc trưng, chất lượng, split, DAS, kết quả theo nguồn |
 
 Mở bằng kernel **Python (fl-ddos)**: `pip install -e .[notebook]` rồi `python -m ipykernel install --user --name fl-ddos`.
 
@@ -194,6 +202,47 @@ python analysis/plots.py --data-dir data --results-dir results
 ```
 
 Chưa có dataset thì chạy `python prepare/make_synthetic.py` rồi `preprocess_csv.py --train-glob "data/raw/synthetic/01-12/*.csv" --test-glob "data/raw/synthetic/03-11/*.csv"`. Dữ liệu giả chỉ để kiểm tra code chạy được, **không dùng làm kết quả**.
+
+## 7. Ba dataset: 3 client × 3 lớp (multidataset_v1)
+
+Kế hoạch đầy đủ: [docs/ke_hoach_code_fl_3_client.md](docs/ke_hoach_code_fl_3_client.md); phân tích nền:
+[docs/phan_tich_ket_hop_ba_dataset.md](docs/phan_tich_ket_hop_ba_dataset.md).
+
+| Client | partition-id | Dataset | Test |
+|---|---:|---|---|
+| 1 | 0 | CIC-DDoS2019 | `*-training.parquet` (quy ước hiện tại) |
+| 2 | 1 | UNSW-NB15 | testing-set chính thức |
+| 3 | 2 | IoT-23 | một fold capture của StratifiedGroupKFold 5-fold |
+
+Đầu ra 0 = BENIGN, 1 = DOS_DDOS (gộp DoS của UNSW và DDoS), 2 = OTHER_ATTACK. Đầu vào: 4 trường cơ sở
+(`duration_s`, `fwd_packets`, `bwd_packets`, `protocol_group`) -> 8 cột liên tục (log1p + AFN theo protocol,
+missing -> 0) qua DAS (θ = 0,001, γ = 0,9, tối đa 8) + 6 cột cố định (one-hot protocol, cờ duration thiếu/bằng 0),
+nên F = 7–14. Không sinh mẫu; class weight theo client, lớp vắng weight = 0. Best checkpoint chọn bằng TB đều
+F1-macro-present của ba validation (không đọc test trong lúc train).
+
+```powershell
+# 1. Dữ liệu: CIC kiểm tra checksum; UNSW (bản sao Nir-J/ML-Projects khóa commit nếu không có URL chính thức);
+#    IoT-23 small ~8,7 GiB (.part, tiếp tục bằng Range, kiểm tra dung lượng trống)
+.\.venv\Scripts\python.exe prepare/download_datasets.py --only iot23 --check-only   # chỉ xem dung lượng
+.\.venv\Scripts\python.exe prepare/download_datasets.py
+# 2. Pipeline (IoT đọc archive theo luồng lần đầu, cache reservoir ở data/cache/iot23/)
+.\.venv\Scripts\python.exe prepare/multidataset_pipeline.py --profile smoke
+# 3. FL smoke + đánh giá
+.\scripts\fl_run.ps1 "scenario='multidataset' num-server-rounds=2 local-epochs=1 seed=0" -Clients 3 -Actors 1 -DataDir data_paper_multi/smoke -ResultsDir results_multidataset/smoke
+.\.venv\Scripts\python.exe analysis/evaluate_multidataset.py --data-dir data_paper_multi/smoke --results-dir results_multidataset/smoke --checkpoint "results_multidataset/smoke/fl/*_best.pt"
+# Toàn bộ ma trận (FL DAS và đối chứng toàn bộ cột × seed 0/1/2, local-only, centralized, đánh giá):
+.\scripts\run_multidataset.ps1 -Profile main -Gpus 1
+```
+
+Artifacts: `data_paper_multi/{smoke|main}[_all]/` (features.json, prep_params.json, dataset_manifest.json,
+split_manifest.parquet, quality_report.json, feature_selection.csv, `multidataset/client_k|val_client_k.parquet`,
+class_weights.json, `test/{dataset}.parquet`). Kết quả: `results_multidataset/{profile}/` (`fl/*_best.pt`, `*_last.pt`,
+`*_rounds.csv`, `*_clients.csv`, evaluation_by_dataset.csv, per_class.csv, per_original_label.csv, confusion.csv,
+figures/, summary.md). Notebook giải thích: `notebooks/03_tien_xu_ly_ba_dataset.ipynb`.
+
+Pipeline dừng (không xuất artifacts) khi có nhãn lạ/mâu thuẫn, split vi phạm ràng buộc nhóm, hoặc DAS không chọn
+được cột nào. Server dừng khi thiếu/trùng PID, round lệch hoặc metric validation không hữu hạn.
+Chưa làm cho multidataset_v1: chạy trên Modal (modal_app.py vẫn cố định luồng CIC).
 
 ## Lỗi thường gặp
 

@@ -4,7 +4,7 @@ Ngày phân tích: **08/11/2026**, múi giờ Asia/Saigon. Mã nguồn tham chi�
 
 Cập nhật yêu cầu triển khai: **3 client, mỗi client một dataset, và 3 lớp BENIGN / DOS_DDOS / OTHER_ATTACK**, đã được người dùng xác nhận. Xem [kế hoạch chi tiết 3 client và 3 lớp](ke_hoach_code_fl_3_client.md). Các mô tả 9 client trong bảng paper bên dưới chỉ là thông tin về bài báo; những phương án nhãn khác là phân tích nền, ngoài phạm vi v1.
 
-Phạm vi: đọc paper PDF do giảng viên cung cấp, kiểm tra mã nguồn và dữ liệu cục bộ, đối chiếu tài liệu gốc của các dataset, đề xuất thiết kế tích hợp. **Chưa triển khai pipeline ba dataset và chưa huấn luyện lại mô hình.**
+Phạm vi: đọc paper PDF do giảng viên cung cấp, kiểm tra mã nguồn và dữ liệu cục bộ, đối chiếu tài liệu gốc của các dataset, đề xuất thiết kế tích hợp. Code pipeline ba dataset đã được triển khai theo kế hoạch (xem trạng thái trong [kế hoạch](ke_hoach_code_fl_3_client.md)); **chưa tải đủ dữ liệu và chưa huấn luyện lại mô hình**, nên các nhận định về đặc trưng tốt nhất cho ba nguồn bên dưới vẫn chưa được kiểm chứng.
 
 ## 1. Kết luận về phần còn thiếu
 

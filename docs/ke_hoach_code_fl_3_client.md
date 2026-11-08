@@ -4,7 +4,7 @@ Cập nhật: **08/11/2026**, múi giờ Asia/Saigon. Mã nguồn tham chiếu: 
 
 **Người dùng đã chốt 3 client, mỗi client một dataset, và 3 lớp BENIGN / DOS_DDOS / OTHER_ATTACK.** Người dùng cũng đã chọn tự tải và tích hợp hai nguồn còn thiếu. Tài liệu này thay thế kế hoạch sơ bộ trước đó; các thông số kỹ thuật còn lại được chốt thành mặc định triển khai bên dưới.
 
-Trạng thái: **đã lập kế hoạch; chưa triển khai pipeline, tải toàn bộ dataset hoặc train lại**.
+Trạng thái (08/11/2026): **đã triển khai code bước 1–5 và 7** (downloader, adapter, split/subset, AFN, DAS, artifacts, notebook 03, loader, server FedAvg chọn best bằng validation, đánh giá ba test, baseline, script ma trận); 20 kiểm thử fixture đạt; adapter CIC đã kiểm tra trên 17 Parquet thật (306.201 / 125.170 dòng, không nhãn lạ, đơn vị µs đạt). **Chưa tải UNSW/IoT-23, chưa chạy pipeline/smoke (bước 6) và thí nghiệm chính (bước 8).** Chưa hỗ trợ Modal cho multidataset_v1.
 
 ## 1. Mục tiêu và phạm vi phiên bản đầu
 
@@ -284,7 +284,7 @@ transform_canonical(frame, fitted_preprocessor) -> DataFrame
 evaluate_checkpoint(checkpoint_path, data_dir, results_dir) -> DataFrame
 ~~~
 
-CLI dự kiến, chưa phải lệnh đã có:
+CLI đã triển khai (ma trận đầy đủ: scripts/run_multidataset.ps1):
 
 ~~~powershell
 .\.venv\Scripts\python.exe prepare/download_datasets.py --config configs/multidataset.json

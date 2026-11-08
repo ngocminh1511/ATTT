@@ -1,0 +1,95 @@
+{
+  "scenario": "multidataset",
+  "pipeline": "multidataset_v1",
+  "schema_version": "canonical4_v1",
+  "parser_version": "adapters_v1",
+  "prep_seed": 42,
+  "train_seeds": [0, 1, 2],
+  "classes": ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"],
+  "clients": [
+    {"partition_id": 0, "client": 1, "dataset_id": "cicddos2019"},
+    {"partition_id": 1, "client": 2, "dataset_id": "unsw_nb15"},
+    {"partition_id": 2, "client": 3, "dataset_id": "iot23"}
+  ],
+  "paths": {
+    "raw": "data/raw",
+    "cache": "data/cache",
+    "out": "data_paper_multi",
+    "results": "results_multidataset"
+  },
+  "sources": {
+    "cicddos2019": {
+      "dir": "data/raw/cicddos2019",
+      "train_glob": "*-testing.parquet",
+      "test_glob": "*-training.parquet",
+      "expected_files": 17,
+      "note": "Quy ước hiện tại của dự án (bản Kaggle dhoogla/cicddos2019): nhóm *-testing làm train pool, *-training làm test.",
+      "reference": "https://www.unb.ca/cic/datasets/ddos-2019.html"
+    },
+    "unsw_nb15": {
+      "dir": "data/raw/unsw_nb15",
+      "official_page": "https://research.unsw.edu.au/projects/unsw-nb15-dataset",
+      "official_urls": {},
+      "mirror": {
+        "repository": "https://github.com/Nir-J/ML-Projects",
+        "commit": "3db94f1af03606275287f4d44a35094d61775c1c",
+        "path": "UNSW-Network_Packet_Classification"
+      },
+      "files": {
+        "train": {"name": "UNSW_NB15_training-set.csv", "rows": 175341},
+        "test": {"name": "UNSW_NB15_testing-set.csv", "rows": 82332}
+      }
+    },
+    "iot23": {
+      "dir": "data/raw/iot23",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/iot_23_datasets_small.tar.gz",
+      "archive": "iot_23_datasets_small.tar.gz",
+      "expected_bytes": 9373916249,
+      "reference": "https://www.stratosphereips.org/datasets-iot23"
+    }
+  },
+  "download": {
+    "free_space_margin_gib": 8,
+    "chunk_bytes": 8388608,
+    "timeout_s": 60
+  },
+  "label_map": {
+    "cicddos2019": {
+      "BENIGN": ["benign"],
+      "DOS_DDOS": ["drdos_dns", "dns", "drdos_ldap", "ldap", "drdos_mssql", "mssql", "drdos_netbios", "netbios",
+                   "drdos_ntp", "ntp", "drdos_snmp", "snmp", "drdos_ssdp", "ssdp", "drdos_udp", "udp",
+                   "syn", "udp-lag", "udplag", "udp_lag", "tftp", "webddos", "portmap"],
+      "OTHER_ATTACK": []
+    },
+    "unsw_nb15": {
+      "BENIGN": ["normal"],
+      "DOS_DDOS": ["dos"],
+      "OTHER_ATTACK": ["fuzzers", "analysis", "backdoor", "backdoors", "exploits", "generic", "reconnaissance",
+                       "shellcode", "worms"]
+    },
+    "iot23": {
+      "benign_labels": ["benign"],
+      "malicious_labels": ["malicious"],
+      "dos_tokens": ["ddos"],
+      "other_tokens": ["c&c", "heartbeat", "filedownload", "torii", "mirai", "partofahorizontalportscan",
+                       "attack", "okiru"]
+    }
+  },
+  "profiles": {
+    "smoke": {"train": 1000, "val": 500, "test": 1000, "rounds": 2, "local_epochs": 1, "seeds": [0]},
+    "main": {"train": 100000, "val": 20000, "test": 50000, "rounds": 30, "local_epochs": 5, "seeds": [0, 1, 2]}
+  },
+  "split": {
+    "n_folds": 5,
+    "group_kfold_seed": 42,
+    "iot_reservoir_per_capture_class": 100000,
+    "iot_batch_rows": 100000
+  },
+  "afn": {"group": "protocol_group"},
+  "das": {"theta": 0.001, "gamma": 0.9, "max_continuous": 8},
+  "class_weight_clip": [0.1, 10.0],
+  "fl": {
+    "arch": "resvgg_swin", "lr": 0.001, "batch_size": 64, "dropout": 0.3,
+    "threshold": 0.5, "baseline_epochs": 150
+  }
+}
