@@ -4,7 +4,7 @@ Hai loại dữ liệu, phân biệt bằng features.json:
   - pipeline cũ (data/): cột đặc trưng ĐÃ slog1p, chuẩn hóa bằng scaler.json khi tạo tensor; nhãn "binary".
   - pipeline paper (data_paper/, prepare/paper_pipeline.py): đặc trưng đã qua AFN…LIS, dùng nguyên;
     nhãn đa lớp "y" theo meta["classes"] (lớp 0 = BENIGN; −100 = lớp chưa gặp lúc train, bỏ qua trong loss).
-  - pipeline multidataset_v1 (data_paper_multi/, prepare/multidataset_pipeline.py): 3 client × 3 lớp,
+  - pipeline multidataset_v1 (data_paper_multi/, prepare/multidataset_pipeline.py): 2 client × 3 lớp,
     đặc trưng đã qua log1p + AFN, dùng nguyên; validation đã chia sẵn (val_client_k.parquet) TRƯỚC mọi bước fit.
 Cả ba đều có cột "label" (tên loại) và "binary" (0/1) cho metric phát hiện nhị phân.
 """

@@ -22,6 +22,7 @@ from fl_ddos import dataset_adapters as ad  # noqa: E402
 from fl_ddos.multidataset_prep import dump_json, read_json  # noqa: E402
 from fl_ddos import multidataset_prep as mp  # noqa: E402
 from fl_ddos import paths  # noqa: E402
+from fl_ddos import multidataset_sampling as ms  # noqa: E402
 
 
 def prepare(root, cfg, profile="tiny", feature_set="das", out=None):
@@ -54,29 +55,6 @@ class AdapterTests(unittest.TestCase):
         df = ad.cic_frame(raw, "x", 0, self.cfg, issues, Counter())
         self.assertEqual(df["y"].tolist(), [ad.UNKNOWN])
         self.assertIn(("cicddos2019", "unknown_label:PortScan"), issues)
-
-    def test_iot_label_rules(self):
-        lab = pd.Series(["Benign", "Malicious", "Malicious", "Malicious", "Malicious", "Benign", "Malicious",
-                         "Malicious"])
-        det = pd.Series(["-", "DDoS", "PartOfAHorizontalPortScan", "C&C-HeartBeat-FileDownload", "Okiru-Attack",
-                         "DDoS", "Weird", "-"])
-        issues = Counter()
-        y = ad.map_iot_labels(lab, det, self.cfg, issues)
-        self.assertEqual(y.tolist(), [0, 1, 2, 2, 2, -1, -1, -1])
-        self.assertEqual(set(k[1].split(":")[0] for k in issues),
-                         {"benign_with_detailed", "unknown_detailed", "malicious_without_detailed"})
-
-    def test_zeek_parser_both_layouts(self):
-        rng = np.random.default_rng(0)
-        for merged in (True, False):
-            import io
-            fh = io.BytesIO(fx.zeek_log(rng, 50, merged))
-            issues, drops = Counter(), Counter()
-            df = pd.concat(list(ad.iter_zeek_file(fh, "cap", self.cfg, issues, drops, chunksize=16)))
-            self.assertEqual(len(df) + sum(drops.values()), 50)  # dòng '#close' không bị đọc thành dữ liệu
-            self.assertFalse(issues)
-            self.assertEqual(sorted(df["y"].unique()), [0, 1, 2])
-            self.assertTrue(df["duration_s"].isna().any())  # '-' -> missing, không phải 0
 
     def test_unsw_html_and_bom(self):
         with tempfile.TemporaryDirectory() as d:
@@ -128,6 +106,38 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(afn["groups"]["udp"]["scale"][0], 1.0)  # phương sai 0 -> scale 1
 
 
+class SamplingTests(unittest.TestCase):
+    def test_train_floor_budget_and_real_availability(self):
+        q = ms.allocate_quota({0: 100, 1: 1000, 2: 100000}, {0: 100, 1: 1000, 2: 100000}, 1000, 100)
+        self.assertEqual(sum(q.values()), 1000)
+        self.assertTrue(all(n >= 100 for n in q.values()))
+        q = ms.allocate_quota({0: 20, 1: 1000}, {0: 20, 1: 1000}, 200, 100)
+        self.assertEqual(q, {0: 20, 1: 180})
+        with self.assertRaises(ms.PrepError):
+            ms.allocate_quota({0: 100, 1: 100}, {0: 100, 1: 100}, 100, 100)
+        with self.assertRaises(ms.PrepError):
+            ms.allocate_quota({0: 100, 1: 100}, {0: 100, 1: 0}, 100, 10)
+
+    def test_evaluation_expands_without_rebalancing(self):
+        full = {0: 100000, 1: 1000, 2: 899000}
+        q, info = ms.evaluation_plan(full, full, 1000, 10000, 10)
+        self.assertEqual(sum(q.values()), 10000)
+        self.assertEqual(q[1], 10)
+        self.assertEqual(q[2], 8990)
+        self.assertTrue(info["expanded"])
+        with self.assertRaises(ms.PrepError):
+            ms.evaluation_plan(full, full, 1000, 5000, 10)
+        with self.assertRaises(ms.PrepError):
+            ms.evaluation_plan(full, {0: 100000, 1: 5, 2: 899000}, 1000, 10000, 10)
+
+    def test_select_subset_bottom_k_by_class(self):
+        df = pd.DataFrame({"y": [0] * 10 + [1] * 10, "sel_hash": list(range(10, 0, -1)) + list(range(10))})
+        selected = ms.select_subset(df, {0: 3, 1: 2})
+        self.assertEqual(df.loc[selected, "sel_hash"].tolist(), [3, 2, 1, 0, 1])
+        np.testing.assert_array_equal(selected, ms.select_subset(df, {0: 3, 1: 2}))
+        with self.assertRaises(ms.PrepError):
+            ms.select_subset(df, {0: 11})
+
 class PipelineTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -147,7 +157,7 @@ class PipelineTests(unittest.TestCase):
         F = len(feats["features"])
         self.assertTrue(7 <= F <= 14)
         self.assertEqual(feats["features"][-6:], mp.FIXED)
-        for k in (1, 2, 3):
+        for k in (1, 2):
             for name in (f"client_{k}", f"val_client_{k}"):
                 df = pd.read_parquet(self.out / "multidataset" / f"{name}.parquet")
                 self.assertEqual(list(df.columns[:F]), feats["features"])
@@ -157,7 +167,7 @@ class PipelineTests(unittest.TestCase):
                     self.assertNotIn(col, feats["features"])
         ds = read_json(self.out / "dataset_manifest.json")
         self.assertEqual({c["partition_id"]: c["dataset_id"] for c in ds["clients"]},
-                         {0: "cicddos2019", 1: "unsw_nb15", 2: "iot23"})
+                         {0: "cicddos2019", 1: "unsw_nb15"})
 
     def test_cic_absent_class_ok(self):
         w = read_json(self.out / "multidataset" / "class_weights.json")
@@ -165,13 +175,22 @@ class PipelineTests(unittest.TestCase):
         val = pd.read_parquet(self.out / "multidataset" / "val_client_1.parquet")
         self.assertNotIn(2, set(val["y"]))
 
+    def test_support_and_capture_sampling_report(self):
+        quality = read_json(self.out / "quality_report.json")
+        self.assertEqual(quality["sampling_policy"], ms.POLICY_VERSION)
+        for ds, splits in quality["used_counts"].items():
+            self.assertTrue(all(n >= 10 for n in splits["train"].values()), ds)
+            for sp in ("val", "test"):
+                self.assertTrue(all(n >= 5 for n in splits[sp].values()), (ds, sp))
+        self.assertEqual(set(quality["used_counts"]), {"cicddos2019", "unsw_nb15"})
+        self.assertEqual(quality["sampling"]["unsw_nb15"]["val"]["distribution"], "natural_class")
+
     def test_split_constraints_and_reproducible(self):
         sm = pd.read_parquet(self.out / "split_manifest.parquet")
         for ds, g in sm.groupby("dataset_id"):
             tr, va = set(g.loc[g.split == "train", "group"]), set(g.loc[g.split == "val", "group"])
             self.assertFalse(tr & va, ds)
-        iot = sm[sm.dataset_id == "iot23"]
-        self.assertTrue((iot.groupby("capture_id")["split"].nunique() == 1).all())
+        self.assertEqual(set(sm["dataset_id"]), {"cicddos2019", "unsw_nb15"})
         res2 = prepare(self.tmp, self.cfg, out=self.tmp / "again")
         self.assertEqual(res2["hashes"], self.res["hashes"])
         sm2 = pd.read_parquet(self.tmp / "again" / "split_manifest.parquet")
@@ -210,7 +229,7 @@ class PipelineTests(unittest.TestCase):
     def test_unknown_label_blocks_artifacts(self):
         tmp = Path(tempfile.mkdtemp(prefix="mds_bad_"))
         try:
-            cfg = fx.build(tmp, iot_extra_labels=[("Malicious", "Mystery")])
+            cfg = fx.build(tmp, cic_labels_train=("Benign", "DrDoS_DNS", "Syn", "Mystery"))
             with self.assertRaises(mp.PrepError):
                 prepare(tmp, cfg)
             out = tmp / "out_tiny_das"
@@ -219,15 +238,25 @@ class PipelineTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_insufficient_evaluation_support_blocks_artifacts(self):
+        import copy
+        cfg = copy.deepcopy(self.cfg)
+        cfg["profiles"]["tiny"]["eval_min_per_class"]["val"] = 1000
+        out = self.tmp / "insufficient_support"
+        with self.assertRaises(mp.PrepError):
+            prepare(self.tmp, cfg, out=out)
+        self.assertFalse((out / "features.json").exists())
+        self.assertEqual(read_json(out / "quality_report.json")["status"], "failed")
+
     def test_loader_and_evaluation(self):
         from fl_ddos import task
         from fl_ddos.multidataset_eval import evaluate_checkpoint
         paths.configure(str(self.out), str(self.tmp / "results"))
         self.assertTrue(task.is_multi())
         self.assertFalse(task.uses_scaler())
-        tr, va = task.load_local(2, "multidataset", 32)
-        self.assertEqual(len(tr.dataset), len(pd.read_parquet(self.out / "multidataset" / "client_3.parquet")))
-        self.assertEqual(len(va.dataset), len(pd.read_parquet(self.out / "multidataset" / "val_client_3.parquet")))
+        tr, va = task.load_local(1, "multidataset", 32)
+        self.assertEqual(len(tr.dataset), len(pd.read_parquet(self.out / "multidataset" / "client_2.parquet")))
+        self.assertEqual(len(va.dataset), len(pd.read_parquet(self.out / "multidataset" / "val_client_2.parquet")))
         self.assertEqual(task.mtb_weights(0, "multidataset")[2], 0.0)
         model = task.make_model("mlp", 0.1)
         md = task.meta()
@@ -237,14 +266,17 @@ class PipelineTests(unittest.TestCase):
         f = self.tmp / "ck.pt"
         torch.save(ck, f)
         res = evaluate_checkpoint(f, self.out, self.tmp / "results")
-        per = res[res.dataset_id.isin(["cicddos2019", "unsw_nb15", "iot23"])]
-        self.assertEqual(len(per), 3)
+        per = res[res.dataset_id.isin(["cicddos2019", "unsw_nb15"])]
+        self.assertEqual(len(per), 2)
         self.assertEqual(per["checkpoint_sha256"].nunique(), 1)
         self.assertEqual(per.set_index("dataset_id").loc["cicddos2019", "support_OTHER_ATTACK"], 0)
         self.assertTrue((self.tmp / "results" / "summary.md").exists())
         bad = dict(ck, hashes={**md["hashes"], "preprocessor": "x"})
         torch.save(bad, f)
         with self.assertRaises(ValueError):
+            evaluate_checkpoint(f, self.out, self.tmp / "results", write=False)
+        torch.save(dict(ck, hashes={**md["hashes"], "split": "different-split"}), f)
+        with self.assertRaisesRegex(ValueError, "Hash split"):
             evaluate_checkpoint(f, self.out, self.tmp / "results", write=False)
 
 
@@ -283,7 +315,7 @@ class MetricTests(unittest.TestCase):
 class ServerTests(unittest.TestCase):
     def _strategy(self):
         from fl_ddos.multidataset_server import MultiSourceFedAvg
-        s = MultiSourceFedAvg(min_train_nodes=3, min_evaluate_nodes=3, min_available_nodes=3)
+        s = MultiSourceFedAvg(min_train_nodes=2, min_evaluate_nodes=2, min_available_nodes=2)
         s._check_and_log_replies = lambda replies, is_train, validate=True: (list(replies), [])
         return s
 
@@ -296,14 +328,16 @@ class ServerTests(unittest.TestCase):
         from fl_ddos.multidataset_server import FLRunError
         s = self._strategy()
         with self.assertRaises(FLRunError):
-            s.aggregate_evaluate(1, [self._reply(0, 1), self._reply(1, 1)])  # thiếu PID 2
+            s.aggregate_evaluate(1, [self._reply(0, 1)])  # thiếu PID 1
         with self.assertRaises(FLRunError):
             s.aggregate_evaluate(1, [self._reply(0, 1), self._reply(1, 1), self._reply(1, 1)])  # trùng PID
         with self.assertRaises(FLRunError):
-            s.aggregate_evaluate(2, [self._reply(0, 1), self._reply(1, 2), self._reply(2, 2)])  # round lệch
+            s.aggregate_evaluate(1, [self._reply(0, 1), self._reply(1, 1), self._reply(2, 1)])  # PID thừa
         with self.assertRaises(FLRunError):
-            s.aggregate_evaluate(1, [self._reply(0, 1), self._reply(1, 1), self._reply(2, 1, float("nan"))])
-        m = s.aggregate_evaluate(1, [self._reply(0, 1, .3), self._reply(1, 1, .6), self._reply(2, 1, .9)])
+            s.aggregate_evaluate(2, [self._reply(0, 1), self._reply(1, 2)])  # round lệch
+        with self.assertRaises(FLRunError):
+            s.aggregate_evaluate(1, [self._reply(0, 1), self._reply(1, 1, float("nan"))])
+        m = s.aggregate_evaluate(1, [self._reply(0, 1, .3), self._reply(1, 1, .9)])
         self.assertAlmostEqual(m["val_score"], 0.6)
         self.assertAlmostEqual(s.val_by_round[1]["val_score"], 0.6)
 

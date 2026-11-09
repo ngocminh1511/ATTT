@@ -1,5 +1,7 @@
 """Chạy toàn bộ thí nghiệm của pipeline paper trên Modal (GPU đám mây).
 
+Pipeline ba dataset dùng modal_multidataset.py, với bundle dữ liệu đã chốt và smoke gate riêng.
+
 Bộ điều phối (run_all) chạy TRÊN Modal, không chạy trên máy local: với `modal run --detach`,
 tắt máy / mất mạng thì app vẫn chạy tiếp. Mỗi thí nghiệm là một container GPU riêng, chạy song song;
 một thí nghiệm lỗi không làm dừng các thí nghiệm khác. Mọi kết quả ghi vào Volume "fl-ddos":

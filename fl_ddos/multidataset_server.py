@@ -1,7 +1,7 @@
-"""Server FL cho pipeline multidataset_v1 (kế hoạch mục 8): 3 client = 3 nguồn, FedAvg theo số mẫu train thật.
+"""Server FL cho pipeline multidataset_v1: 2 client = 2 nguồn (CIC, UNSW), FedAvg theo số mẫu train thật.
 
-Mỗi vòng: train cục bộ -> kiểm tra đủ đúng PID 0/1/2, cùng round -> FedAvg -> gửi model đã gộp về ba
-client đánh giá trên validation riêng -> điểm chọn model = TB đều F1-macro-present của ba validation.
+Mỗi vòng: train cục bộ -> kiểm tra đủ đúng PID 0/1, cùng round -> FedAvg -> gửi model đã gộp về hai
+client đánh giá trên validation riêng -> điểm chọn model = TB đều F1-macro-present của hai validation.
 evaluate_fn chỉ đọc điểm validation đã gộp của đúng vòng đó (Flower gọi aggregate_evaluate trước
 evaluate_fn); không có lượt đọc test nào ở đây. Vòng 0 chỉ ghi trạng thái khởi tạo.
 
@@ -27,7 +27,7 @@ from fl_ddos import paths
 from fl_ddos.multidataset_prep import dump_json, read_json
 from fl_ddos.task import classes, features, make_model, meta, set_seed
 
-EXPECTED_PIDS = (0, 1, 2)
+EXPECTED_PIDS = (0, 1)
 
 
 class FLRunError(RuntimeError):
@@ -107,7 +107,7 @@ def pid_map() -> dict:
     clients = read_json(f)["clients"]
     m = {int(c["partition_id"]): c["dataset_id"] for c in clients}
     if sorted(m) != list(EXPECTED_PIDS) or len(set(m.values())) != len(m):
-        raise FLRunError(f"dataset_manifest.json phải khóa PID 0/1/2 với ba nguồn khác nhau: {m}")
+        raise FLRunError(f"dataset_manifest.json phải khóa PID {list(EXPECTED_PIDS)} với các nguồn khác nhau: {m}")
     return m
 
 
@@ -124,7 +124,7 @@ def run_multidataset(grid: Grid, context: Context) -> None:
     seed, arch, dropout = int(rc["seed"]), str(rc.get("arch", "resvgg_swin")), float(rc.get("dropout", 0.3))
     n_clients, n_rounds = int(rc["num-clients"]), int(rc["num-server-rounds"])
     if n_clients != len(EXPECTED_PIDS):
-        raise FLRunError(f"multidataset_v1 cần đúng 3 client, run config có num-clients={n_clients}")
+        raise FLRunError(f"multidataset_v1 cần đúng {len(EXPECTED_PIDS)} client, run config có num-clients={n_clients}")
     if float(rc.get("proximal-mu", 0)) or str(rc.get("strategy", "fedavg")) != "fedavg" or rc.get("poison-clients"):
         raise FLRunError("multidataset_v1 chỉ hỗ trợ FedAvg không poison/FedProx trong v1")
     pmap = pid_map()

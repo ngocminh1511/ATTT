@@ -8,8 +8,7 @@
   "classes": ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"],
   "clients": [
     {"partition_id": 0, "client": 1, "dataset_id": "cicddos2019"},
-    {"partition_id": 1, "client": 2, "dataset_id": "unsw_nb15"},
-    {"partition_id": 2, "client": 3, "dataset_id": "iot23"}
+    {"partition_id": 1, "client": 2, "dataset_id": "unsw_nb15"}
   ],
   "paths": {
     "raw": "data/raw",
@@ -39,13 +38,6 @@
         "train": {"name": "UNSW_NB15_training-set.csv", "rows": 175341},
         "test": {"name": "UNSW_NB15_testing-set.csv", "rows": 82332}
       }
-    },
-    "iot23": {
-      "dir": "data/raw/iot23",
-      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/iot_23_datasets_small.tar.gz",
-      "archive": "iot_23_datasets_small.tar.gz",
-      "expected_bytes": 9373916249,
-      "reference": "https://www.stratosphereips.org/datasets-iot23"
     }
   },
   "download": {
@@ -66,24 +58,28 @@
       "DOS_DDOS": ["dos"],
       "OTHER_ATTACK": ["fuzzers", "analysis", "backdoor", "backdoors", "exploits", "generic", "reconnaissance",
                        "shellcode", "worms"]
-    },
-    "iot23": {
-      "benign_labels": ["benign"],
-      "malicious_labels": ["malicious"],
-      "dos_tokens": ["ddos"],
-      "other_tokens": ["c&c", "heartbeat", "filedownload", "torii", "mirai", "partofahorizontalportscan",
-                       "attack", "okiru"]
     }
   },
   "profiles": {
-    "smoke": {"train": 1000, "val": 500, "test": 1000, "rounds": 2, "local_epochs": 1, "seeds": [0]},
-    "main": {"train": 100000, "val": 20000, "test": 50000, "rounds": 30, "local_epochs": 5, "seeds": [0, 1, 2]}
+    "smoke": {
+      "train": 1000, "val": 500, "test": 1000,
+      "train_min_per_class": 100,
+      "eval_min_per_class": {"val": 3, "test": 5},
+      "eval_max_samples": {"val": 5000, "test": 10000},
+      "integration_only": true,
+      "rounds": 2, "local_epochs": 1, "seeds": [0]
+    },
+    "main": {
+      "train": 100000, "val": 20000, "test": 50000,
+      "train_min_per_class": 10000,
+      "eval_min_per_class": {"val": 200, "test": 500},
+      "eval_max_samples": {"val": 100000, "test": 200000},
+      "rounds": 30, "local_epochs": 5, "seeds": [0, 1, 2]
+    }
   },
   "split": {
     "n_folds": 5,
-    "group_kfold_seed": 42,
-    "iot_reservoir_per_capture_class": 100000,
-    "iot_batch_rows": 100000
+    "group_kfold_seed": 42
   },
   "afn": {"group": "protocol_group"},
   "das": {"theta": 0.001, "gamma": 0.9, "max_continuous": 8},

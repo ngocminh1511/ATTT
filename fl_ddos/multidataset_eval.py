@@ -1,4 +1,4 @@
-"""Đánh giá cuối cho multidataset_v1 (kế hoạch mục 9): MỘT checkpoint -> ba tập test, cùng trọng số và ngưỡng.
+"""Đánh giá cuối cho multidataset_v1 (kế hoạch mục 9): MỘT checkpoint -> hai tập test, cùng trọng số và ngưỡng.
 
 Metric mỗi nguồn:
   - 3 lớp: confusion matrix 3×3, accuracy, F1-macro-present (TB F1 của các lớp có support thật),
@@ -24,7 +24,7 @@ from fl_ddos import paths
 from fl_ddos.multidataset_prep import read_json
 from fl_ddos.task import MULTI, _meta_at, build_model, meta, predict, to_tensor
 
-SOURCES = ("cicddos2019", "unsw_nb15", "iot23")
+SOURCES = ("cicddos2019", "unsw_nb15")
 CLASSES = ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"]
 HEADLINE = ["acc", "f1_macro_present", "attack_f1", "attack_recall", "attack_far_benign", "attack_roc_auc",
             "dos_f1", "dos_recall", "dos_far_benign", "dos_roc_auc"]
@@ -106,7 +106,7 @@ def load_checkpoint(ckpt_path) -> tuple[torch.nn.Module, dict]:
         raise ValueError(f"{ckpt_path}: checkpoint không phải {MULTI}")
     if ck["features"] != md["features"] or ck["classes"] != md["classes"]:
         raise ValueError("Checkpoint và data dir khác danh sách đặc trưng/lớp")
-    for k in ("schema", "preprocessor"):
+    for k in ("schema", "preprocessor", "split"):
         if ck.get("hashes", {}).get(k) != md.get("hashes", {}).get(k):
             raise ValueError(f"Hash {k} của checkpoint khác data dir: {ck.get('hashes', {}).get(k)} != "
                              f"{md.get('hashes', {}).get(k)}")
@@ -206,14 +206,16 @@ def _fmt(v):
 
 def write_summary(results_dir: Path):
     res = pd.read_csv(results_dir / "evaluation_by_dataset.csv")
-    lines = ["# Kết quả multidataset_v1 (3 client × 3 lớp)", "",
-             "Mỗi checkpoint được chọn bằng validation rồi đánh giá MỘT lần trên ba tập test với cùng trọng số, "
+    lines = ["# Kết quả multidataset_v1 (2 client × 3 lớp)", "",
+             "Mỗi checkpoint được chọn bằng validation rồi đánh giá MỘT lần trên hai tập test với cùng trọng số, "
              "ngưỡng 0,5. `attack_*` = phát hiện mọi tấn công (1 − P(BENIGN)); `dos_*` = phát hiện nhóm DoS/DDoS "
              "(P(DOS_DDOS)). F1-macro-present chỉ lấy TB trên các lớp có support thật. N/A = không xác định "
              "(thiếu một trong hai nhãn). Tập test là subset theo quota lớp, không phải toàn bộ benchmark.", ""]
     cols = ["acc", "f1_macro_present", "attack_f1", "attack_far_benign", "attack_roc_auc", "dos_f1", "dos_roc_auc"]
     for (method, prof), g in res.groupby(["method", "profile"], dropna=False):
         seeds = sorted(g["seed"].dropna().unique().tolist())
+        if prof == "smoke":
+            lines += ["**SMOKE: chỉ kiểm tra tích hợp; không dùng các điểm dưới đây để kết luận chất lượng mô hình.**", ""]
         lines += [f"## {method} — profile {prof}", "", f"Seed: {seeds} ({len(seeds)} lượt)." +
                   (" Một seed: không đánh giá độ biến động." if len(seeds) < 2 else ""), "",
                   "| Nguồn | n | " + " | ".join(cols) + " |", "|---|---:|" + "---:|" * len(cols)]

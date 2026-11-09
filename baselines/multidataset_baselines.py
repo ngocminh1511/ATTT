@@ -1,10 +1,10 @@
 """Baseline đối chứng cho multidataset_v1 (kế hoạch mục 9), cùng split/subset với FL.
 
   local        mỗi nguồn một mô hình, chỉ học train của nguồn đó; chọn epoch theo validation của nguồn đó
-  centralized  gộp train ba nguồn (nghiên cứu tập trung); chọn epoch theo TB đều F1-macro-present 3 validation
+  centralized  gộp train hai nguồn (nghiên cứu tập trung); chọn epoch theo TB đều F1-macro-present 2 validation
 
 Cả hai: class weight tính bằng cùng hàm với FL trên đúng tập train được dùng, Adam lr 0.001, batch 64,
-mốc 150 epoch (= 30 vòng × 5 epoch của FL). Best checkpoint được đánh giá một lần trên ba tập test bằng
+mốc 150 epoch (= 30 vòng × 5 epoch của FL). Best checkpoint được đánh giá một lần trên hai tập test bằng
 fl_ddos/multidataset_eval.py. Không gọi centralized là cận trên được bảo đảm.
 
   python baselines/multidataset_baselines.py --mode local --data-dir data_paper_multi/smoke \

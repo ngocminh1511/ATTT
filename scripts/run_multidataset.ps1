@@ -1,9 +1,9 @@
-# Ma trận thí nghiệm multidataset_v1 (docs/ke_hoach_code_fl_3_client.md, mục 9).
+# Ma trận thí nghiệm multidataset_v1: 2 client (CIC-DDoS2019, UNSW-NB15) × 3 lớp.
 #   .\scripts\run_multidataset.ps1 -Profile smoke                # 2 vòng × 1 epoch, seed 0, kiểm tra tích hợp
 #   .\scripts\run_multidataset.ps1 -Profile main                 # 30 × 5, seed 0/1/2, DAS và đối chứng toàn bộ cột
 #   .\scripts\run_multidataset.ps1 -Profile main -Steps prep     # chỉ chuẩn bị dữ liệu
 # -Steps: prep, fl, fl_all, baselines, eval (mặc định tất cả). -Gpus: phần GPU cho mỗi ClientApp (0 = CPU).
-# Yêu cầu: đã chạy prepare/download_datasets.py (UNSW, IoT-23).
+# Yêu cầu: đã chạy prepare/download_datasets.py (CIC, UNSW).
 param([ValidateSet("smoke", "main")][string]$Profile = "smoke",
       [string[]]$Steps = @("prep", "fl", "fl_all", "baselines", "eval"),
       [int]$Actors = 1, [double]$Gpus = 0)
@@ -39,7 +39,7 @@ try {
         if ($Steps -notcontains $want) { continue }
         foreach ($s in $seeds) {
             $rc = "scenario='multidataset' arch='$($cfg.fl.arch)' num-server-rounds=$rounds local-epochs=$epochs seed=$s"
-            Invoke-Step "FL $($v.Name) seed $s" { & (Join-Path $PSScriptRoot "fl_run.ps1") $rc -Clients 3 -Actors $Actors -Gpus $Gpus -DataDir $v.Data -ResultsDir $v.Res }
+            Invoke-Step "FL $($v.Name) seed $s" { & (Join-Path $PSScriptRoot "fl_run.ps1") $rc -Clients $cfg.clients.Count -Actors $Actors -Gpus $Gpus -DataDir $v.Data -ResultsDir $v.Res }
         }
     }
     $main = $variants[0]

@@ -34,7 +34,7 @@ def client_file(scenario: str, pid: int) -> Path:
 
 
 def val_file(scenario: str, pid: int) -> Path:
-    """Validation chia sẵn của pipeline multidataset_v1: val_client_1..3.parquet."""
+    """Validation chia sẵn của pipeline multidataset_v1: val_client_1..K.parquet."""
     return DATA / scenario / f"val_client_{pid + 1}.parquet"
 
 

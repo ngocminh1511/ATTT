@@ -1,4 +1,4 @@
-"""Đánh giá cuối multidataset_v1: một best checkpoint -> ba tập test (CIC / UNSW / IoT-23).
+"""Đánh giá cuối multidataset_v1: một best checkpoint -> hai tập test (CIC / UNSW).
 
   python analysis/evaluate_multidataset.py --data-dir data_paper_multi/smoke \
       --results-dir results_multidataset/smoke --checkpoint results_multidataset/smoke/fl/multidataset_resvgg_swin_seed0_best.pt

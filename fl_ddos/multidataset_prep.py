@@ -1,8 +1,8 @@
-"""Pipeline dữ liệu multidataset_v1: 3 client × 3 lớp (docs/ke_hoach_code_fl_3_client.md).
+"""Pipeline dữ liệu multidataset_v1: 2 client (CIC-DDoS2019, UNSW-NB15) × 3 lớp.
 
 Thứ tự: adapter -> kiểm tra nhãn/chất lượng -> chia train/validation/test theo nhóm -> lấy subset theo
 quota lớp (hash seed 42) -> 8 cột liên tục + 6 cột cố định -> log1p -> AFN theo protocol (thống kê
-train ba client, hỗ trợ missing) -> DAS (CRA + IDF, pooled) -> class weight -> artifacts.
+train hai client, hỗ trợ missing) -> DAS (CRA + IDF, pooled) -> class weight -> artifacts.
 
 Không sinh mẫu (CTA/DPCA), không TEC/MTB/NDS/JAA/DRA/LIS trong v1 (kế hoạch mục 2).
 Mọi tham số fit chỉ dùng train; validation/test chỉ transform.
@@ -20,6 +20,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 
 from fl_ddos import dataset_adapters as ad
+from fl_ddos.multidataset_sampling import POLICY_VERSION, PrepError, allocate_quota, evaluation_plan, select_subset
 
 CONTINUOUS = ["duration_s", "fwd_packets", "bwd_packets", "total_packets", "flow_packets_s",
               "fwd_packets_s", "bwd_packets_s", "bwd_packet_fraction"]
@@ -27,10 +28,6 @@ FIXED = ["proto_tcp", "proto_udp", "proto_icmp", "proto_other", "duration_missin
 KEEP_META = ["dataset_id", "capture_id", "row_id", "original_label", "timestamp"]
 EPS = 1e-12
 SPLITS = ("train", "val", "test")
-
-
-class PrepError(RuntimeError):
-    """Lỗi dữ liệu làm pipeline dừng mà không xuất artifact chính."""
 
 
 def log(msg: str):
@@ -129,92 +126,6 @@ def collect_tabular(dataset_id: str, cfg: dict, root: Path) -> dict:
             "checks": checks, "files": files}
 
 
-def _reservoir_add(res: dict, frame: pd.DataFrame, cap: int):
-    """Giữ `cap` dòng có sel_hash nhỏ nhất cho mỗi lớp (bottom-k = mẫu ngẫu nhiên đều, tái lập)."""
-    for c, g in frame[frame["y"] >= 0].groupby("y"):
-        cur = res.get(c)
-        if cur is not None and len(cur) >= cap:
-            g = g[g["sel_hash"] < cur["sel_hash"].max()]
-            if g.empty:
-                continue
-        merged = g if cur is None else pd.concat([cur, g], ignore_index=True)
-        res[c] = merged.nsmallest(cap, "sel_hash") if len(merged) > cap else merged
-
-
-def collect_iot(cfg: dict, root: Path, archive: Path | None = None) -> dict:
-    """Đọc archive IoT-23 theo luồng; cache Parquet reservoir + counts theo từng capture."""
-    src = cfg["sources"]["iot23"]
-    archive = Path(archive or root / src["dir"] / src["archive"])
-    R = int(cfg["split"]["iot_reservoir_per_capture_class"])
-    cache = root / cfg["paths"]["cache"] / "iot23" / f"{cfg['parser_version']}_seed{cfg['prep_seed']}_r{R}"
-    cache.mkdir(parents=True, exist_ok=True)
-    index_file = cache / "_complete.json"
-
-    def capture_ok(cap):
-        meta_f, pq = cache / f"{cap}.json", cache / f"{cap}.parquet"
-        if not (meta_f.exists() and pq.exists()):
-            return None
-        m = read_json(meta_f)
-        if m.get("parser_version") != cfg["parser_version"] or m.get("sha256") != sha256_file(pq):
-            raise PrepError(f"IoT cache {pq} sai checksum/phiên bản parser. Xóa thư mục {cache} rồi chạy lại.")
-        return m
-
-    if index_file.exists():
-        index = read_json(index_file)
-        metas = {c: capture_ok(c) for c in index["captures"]}
-        if any(v is None for v in metas.values()):
-            raise PrepError(f"IoT cache thiếu capture so với {index_file}. Xóa {cache} rồi chạy lại.")
-        log(f"IoT: dùng lại cache {len(metas)} capture tại {cache}")
-    else:
-        if not archive.exists():
-            raise PrepError(f"IoT: thiếu {archive}. Chạy prepare/download_datasets.py trước.")
-        done = {p.stem for p in cache.glob("*.json") if not p.name.startswith("_") and capture_ok(p.stem)}
-        log(f"IoT: đọc {archive.name} theo luồng ({len(done)} capture đã có cache, vẫn phải giải nén tuần tự)")
-        issues, drops, state = Counter(), Counter(), {}
-
-        def on_start(cap, member):
-            state.update(cap=cap, res={}, counts=Counter(), n=0, t0=time.time(),
-                         issues0=Counter(issues), drops0=Counter(drops), size=member.size)
-            log(f"IoT: bắt đầu {cap} ({member.size / 2**20:,.0f} MiB)")
-
-        for cap, frame in ad.iter_iot_archive(archive, cfg, issues, drops, skip=frozenset(done),
-                                              chunksize=int(cfg["split"]["iot_batch_rows"]), on_capture_start=on_start):
-            if frame is not None:
-                _reservoir_add(state["res"], frame, R)
-                for (yv, lab), n in frame.groupby(["y", "original_label"]).size().items():
-                    state["counts"][(int(yv), lab)] += int(n)
-                state["n"] += len(frame)
-                continue
-            res = [state["res"][c] for c in sorted(state["res"])]
-            out = pd.concat(res, ignore_index=True) if res else pd.DataFrame(columns=ad.META + ad.BASE + ["flow_uid"])
-            pq = cache / f"{cap}.parquet"
-            out.to_parquet(pq, index=False)
-            m = {"capture_id": cap, "parser_version": cfg["parser_version"], "n_valid_rows": state["n"],
-                 "member_bytes": state["size"], "counts": counter_rows(state["counts"], ("y", "original_label")),
-                 "issues": counter_rows(issues - state["issues0"], ("dataset_id", "issue")),
-                 "drops": counter_rows(drops - state["drops0"], ("reason", "original_label")),
-                 "reservoir_rows": len(out), "sha256": sha256_file(pq)}
-            dump_json(m, cache / f"{cap}.json")
-            done.add(cap)
-            log(f"IoT: xong {cap}: {state['n']:,} dòng hợp lệ, giữ {len(out):,}, {time.time() - state['t0']:.0f}s")
-        st = archive.stat()
-        dump_json({"captures": sorted(done), "archive": archive.name, "archive_bytes": st.st_size,
-                   "parser_version": cfg["parser_version"], "reservoir": R}, index_file)
-        metas = {c: capture_ok(c) for c in sorted(done)}
-    if not metas:
-        raise PrepError("IoT: archive không có conn.log.labeled nào")
-    cand = pd.concat([pd.read_parquet(cache / f"{c}.parquet") for c in sorted(metas)], ignore_index=True)
-    counts = pd.DataFrame([{"capture_id": c, **r} for c, m in metas.items() for r in m["counts"]])
-    issues, drops = Counter(), Counter()
-    for m in metas.values():
-        for r in m["issues"]:
-            issues[(r["dataset_id"], r["issue"])] += r["n"]
-        for r in m["drops"]:
-            drops[(r["reason"], r["original_label"])] += r["n"]
-    return {"dataset_id": "iot23", "candidates": cand, "capture_counts": counts, "issues": issues, "drops": drops,
-            "checks": [], "files": {"archive": archive.name, "captures": sorted(metas)}, "cache": str(cache)}
-
-
 # ================================================================ chia tập
 def group_kfold(y, groups, n_folds, seed):
     sgkf = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)
@@ -234,59 +145,6 @@ def split_train_val(pool: pd.DataFrame, n_folds: int, seed: int, dataset_id: str
         if set(np.unique(y[val])) == need and set(np.unique(y[~val])) == need:
             return np.where(val, "val", "train"), {"val_fold": k, "n_folds": n_folds, "seed": seed}
     raise PrepError(f"{dataset_id}: không có fold validation nào chứa đủ lớp {sorted(need)} ở cả train và val")
-
-
-def split_iot(cand: pd.DataFrame, n_folds: int, seed: int) -> tuple[np.ndarray, dict]:
-    """StratifiedGroupKFold theo capture trên reservoir; chọn cặp (test, val) đầu tiên đủ ba lớp mỗi phía."""
-    y, g = cand["y"].values, cand["capture_id"].values
-    if len(np.unique(g)) < n_folds:
-        raise PrepError(f"IoT: chỉ có {len(np.unique(g))} capture, cần ≥ {n_folds} cho group k-fold")
-    fold = group_kfold(y, g, n_folds, seed)
-    need = set(range(len(ad.CLASSES)))
-    for t in range(n_folds):
-        for v in range(n_folds):
-            if v == t:
-                continue
-            s = np.where(fold == t, "test", np.where(fold == v, "val", "train"))
-            if all(set(np.unique(y[s == name])) >= need for name in SPLITS):
-                return s, {"test_fold": t, "val_fold": v, "n_folds": n_folds, "seed": seed}
-    tab = pd.crosstab(cand["capture_id"], cand["y"]).to_string()
-    raise PrepError(f"IoT: không có cặp fold test/val nào đủ ba lớp ở train/val/test.\nCapture × lớp:\n{tab}")
-
-
-def allocate_quota(full: dict, avail: dict, cap: int) -> dict:
-    """Quota lớp tỷ lệ với số dòng gốc của split (water-filling khi một lớp không đủ ứng viên).
-    Giữ ≥ 1 mẫu cho lớp có mặt nếu ngân sách cho phép; không nhân bản."""
-    classes = [c for c in full if full[c] > 0 and avail.get(c, 0) > 0]
-    if sum(avail[c] for c in classes) <= cap:
-        return {c: int(avail[c]) for c in classes}
-    q = {c: 0 for c in classes}
-    if cap >= len(classes):
-        q = {c: 1 for c in classes}
-    budget, open_ = cap - sum(q.values()), [c for c in classes if avail[c] > q[c]]
-    while budget > 0 and open_:
-        tot = sum(full[c] for c in open_)
-        share = {c: budget * full[c] / tot for c in open_}
-        add = {c: min(int(np.floor(share[c])), avail[c] - q[c]) for c in open_}
-        if sum(add.values()) == 0:  # phần dư: chia theo phần lẻ lớn nhất, tie theo chỉ số lớp
-            for c in sorted(open_, key=lambda c: (-(share[c] - np.floor(share[c])), c))[:budget]:
-                add[c] = 1
-        for c in open_:
-            q[c] += add[c]
-        budget = cap - sum(q.values())
-        open_ = [c for c in open_ if avail[c] > q[c]]
-    return q
-
-
-def select_subset(df: pd.DataFrame, quota: dict) -> np.ndarray:
-    """Chỉ số dòng được chọn: mỗi lớp lấy `quota` dòng có sel_hash nhỏ nhất."""
-    keep = []
-    for c, k in quota.items():
-        idx = np.where(df["y"].values == c)[0]
-        if k:
-            order = np.argsort(df["sel_hash"].values[idx], kind="stable")[:k]
-            keep.append(idx[order])
-    return np.sort(np.concatenate(keep)) if keep else np.array([], dtype=np.int64)
 
 
 # ================================================================ đặc trưng
@@ -503,27 +361,14 @@ def build_splits(sources: dict, cfg: dict) -> dict:
     nf, seed = int(cfg["split"]["n_folds"]), int(cfg["split"]["group_kfold_seed"])
     out = {}
     for ds, s in sources.items():
-        if ds == "iot23":
-            cand = s["candidates"].copy()
-            split, info = split_iot(cand, nf, seed)
-            cand["split"], cand["group"] = split, cand["capture_id"]
-            cap_split = cand.groupby("capture_id")["split"].first()
-            cc = s["capture_counts"].assign(split=lambda d: d["capture_id"].map(cap_split))
-            unassigned = cc["split"].isna()
-            if unassigned.any():  # capture có dòng hợp lệ nhưng không lớp nào vào reservoir -> không xảy ra
-                raise PrepError(f"IoT: capture không có split: {sorted(cc.loc[unassigned, 'capture_id'].unique())}")
-            full = {sp: g.groupby("y")["n"].sum().to_dict() for sp, g in cc[cc["y"] >= 0].groupby("split")}
-            info["captures"] = {sp: sorted(cap_split[cap_split == sp].index) for sp in SPLITS}
-            rows = cand
-        else:
-            pool, test = s["pools"]["pool"].copy(), s["pools"]["test"].copy()
-            pool = pool[pool["y"] >= 0].reset_index(drop=True)
-            test = test[test["y"] >= 0].reset_index(drop=True)
-            pool["split"], info = split_train_val(pool, nf, seed, ds)
-            test["split"] = "test"
-            rows = pd.concat([pool, test], ignore_index=True)
-            rows["group"] = rows["fingerprint"].astype(str)
-            full = {sp: g["y"].value_counts().to_dict() for sp, g in rows.groupby("split")}
+        pool, test = s["pools"]["pool"].copy(), s["pools"]["test"].copy()
+        pool = pool[pool["y"] >= 0].reset_index(drop=True)
+        test = test[test["y"] >= 0].reset_index(drop=True)
+        pool["split"], info = split_train_val(pool, nf, seed, ds)
+        test["split"] = "test"
+        rows = pd.concat([pool, test], ignore_index=True)
+        rows["group"] = rows["fingerprint"].astype(str)
+        full = {sp: g["y"].value_counts().to_dict() for sp, g in rows.groupby("split")}
         out[ds] = {"rows": rows, "info": info, "full_counts": full}
     return out
 
@@ -532,13 +377,24 @@ def choose_subsets(splits: dict, caps: dict) -> dict:
     for ds, s in splits.items():
         rows = s["rows"]
         sel = np.zeros(len(rows), dtype=bool)
-        s["quota"] = {}
+        s["quota"], s["sampling"] = {}, {}
         for sp in SPLITS:
             idx = np.where(rows["split"].values == sp)[0]
             part = rows.iloc[idx]
             avail = part["y"].value_counts().to_dict()
-            q = allocate_quota({int(k): int(v) for k, v in s["full_counts"].get(sp, {}).items()},
-                               {int(k): int(v) for k, v in avail.items()}, int(caps[sp]))
+            full = {int(k): int(v) for k, v in s["full_counts"].get(sp, {}).items() if v > 0}
+            if sp == "train":
+                minimum = int(caps.get("train_min_per_class", 1))
+                q = allocate_quota(full, avail, int(caps[sp]), minimum)
+                s["sampling"][sp] = {"base_budget": caps[sp], "effective_budget": sum(q.values()),
+                                      "minimum_per_class": minimum, "distribution": "floor_then_proportional",
+                                      "floor_shortfall": {ad.CLASSES[c]: {"available": avail.get(c, 0),
+                                                                          "requested": minimum}
+                                                          for c in full if avail.get(c, 0) < minimum}, "quota": q}
+            else:
+                q, s["sampling"][sp] = evaluation_plan(
+                    full, avail, int(caps[sp]), int(caps.get("eval_max_samples", {}).get(sp, caps[sp])),
+                    int(caps.get("eval_min_per_class", {}).get(sp, 1)))
             sel[idx[select_subset(part.reset_index(drop=True), q)]] = True
             s["quota"][sp] = {ad.CLASSES[c]: int(n) for c, n in q.items()}
         rows["selected"] = sel
@@ -552,18 +408,11 @@ def independence_checks(splits: dict) -> dict:
         gs = {sp: set(r.loc[r["split"] == sp, "group"]) for sp in SPLITS}
         dup_ids = int(r["row_id"].duplicated().sum())
         chk = {"train_val_group_overlap": len(gs["train"] & gs["val"]), "duplicate_row_id": dup_ids}
-        if ds == "iot23":
-            chk["capture_in_multiple_splits"] = len((gs["train"] & gs["val"]) | (gs["train"] & gs["test"]) |
-                                                    (gs["val"] & gs["test"]))
-            if "flow_uid" in r:
-                chk["duplicate_flow_uid_in_reservoir"] = int(r.duplicated(["capture_id", "flow_uid"]).sum())
-        else:
-            fp = {sp: set(r.loc[r["split"] == sp, "fingerprint"]) for sp in SPLITS}
-            chk["train_vectors_also_in_test"] = len(fp["train"] & fp["test"])
-            chk["val_vectors_also_in_test"] = len(fp["val"] & fp["test"])
-            chk["note"] = "Vector trùng với test chính thức chỉ được báo cáo, không tự chứng minh rò rỉ nhãn."
-        bad = chk["train_val_group_overlap"] or dup_ids or chk.get("capture_in_multiple_splits", 0)
-        if bad:
+        fp = {sp: set(r.loc[r["split"] == sp, "fingerprint"]) for sp in SPLITS}
+        chk["train_vectors_also_in_test"] = len(fp["train"] & fp["test"])
+        chk["val_vectors_also_in_test"] = len(fp["val"] & fp["test"])
+        chk["note"] = "Vector trùng với test chính thức chỉ được báo cáo, không tự chứng minh rò rỉ nhãn."
+        if chk["train_val_group_overlap"] or dup_ids:
             raise PrepError(f"{ds}: vi phạm ràng buộc split: {chk}")
         for sp in SPLITS:
             if not ((r["split"] == sp) & r["selected"]).any():
@@ -579,7 +428,7 @@ def load_sources(cfg: dict, root: Path, only=None) -> dict:
         if only and ds not in only:
             continue
         log(f"Đọc nguồn {ds}")
-        sources[ds] = collect_iot(cfg, root) if ds == "iot23" else collect_tabular(ds, cfg, root)
+        sources[ds] = collect_tabular(ds, cfg, root)
     return sources
 
 
@@ -604,16 +453,20 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
                         f"Xem {out / 'quality_report.json'}: {list(issues.items())[:5]}")
 
     log("Chia train/validation/test theo nhóm")
-    splits = choose_subsets(build_splits(sources, cfg), {"train": caps["train"], "val": caps["val"],
-                                                          "test": caps["test"]})
-    quality["independence"] = independence_checks(splits)
+    try:
+        splits = choose_subsets(build_splits(sources, cfg), caps)
+        quality["independence"] = independence_checks(splits)
+    except PrepError as e:
+        quality.update({"status": "failed", "sampling_policy": POLICY_VERSION, "error": str(e)})
+        dump_json(quality, out / "quality_report.json")
+        raise
     sub = {ds: {sp: s["rows"][(s["rows"]["split"] == sp) & s["rows"]["selected"]].reset_index(drop=True)
                 for sp in SPLITS} for ds, s in splits.items()}
     gtrain = set().union(*[set(sub[ds]["train"]["y"]) for ds in sub])
     if gtrain != set(range(len(ad.CLASSES))):
-        raise PrepError(f"Train gộp của ba client thiếu lớp: có {sorted(gtrain)}")
+        raise PrepError(f"Train gộp của các client thiếu lớp: có {sorted(gtrain)}")
 
-    log("Fit log1p + AFN theo protocol và DAS trên train ba client")
+    log("Fit log1p + AFN theo protocol và DAS trên train các client")
     fitted, table = fit_preprocessor({ds: sub[ds]["train"] for ds in sub}, cfg, feature_set)
     log(f"Đặc trưng cuối ({len(fitted['features'])}): {fitted['features']}")
 
@@ -650,7 +503,8 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
     dump_json({"pipeline": cfg["pipeline"], "scenario": cfg["scenario"], "schema_version": cfg["schema_version"],
                "classes": ad.CLASSES, "features": fitted["features"],
                "continuous_selected": fitted["continuous_selected"], "fixed": FIXED, "feature_set": feature_set,
-               "profile": profile, "hashes": hashes, "n_clients": len(cfg["clients"])}, out / "features.json")
+                "profile": profile, "sampling_policy": POLICY_VERSION,
+                "hashes": hashes, "n_clients": len(cfg["clients"])}, out / "features.json")
 
     quality.update({
         "full_counts": {ds: {sp: {ad.CLASSES[int(c)]: int(n) for c, n in v.items()} for sp, v in s["full_counts"].items()}
@@ -659,21 +513,49 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
         "used_counts": {ds: {sp: {ad.CLASSES[int(c)]: int(n) for c, n in sub[ds][sp]["y"].value_counts()
                                   .sort_index().items()} for sp in SPLITS} for ds in sub},
         "quota": {ds: s["quota"] for ds, s in splits.items()},
+        "sampling_policy": POLICY_VERSION,
+        "integration_only": bool(caps.get("integration_only", False)),
+        "sampling": {ds: s["sampling"] for ds, s in splits.items()},
+        "capture_support": {ds: {sp: {ad.CLASSES[int(c)]: {
+            "n_captures": int(g["capture_id"].nunique()),
+            "counts": {str(cap): int(n) for cap, n in g.groupby("capture_id").size().items()}}
+            for c, g in sub[ds][sp].groupby("y")} for sp in SPLITS} for ds in sub},
         "missing_duration": {ds: {sp: float(sub[ds][sp]["duration_s"].isna().mean()) for sp in SPLITS} for ds in sub},
-        "note": "Subset theo quota lớp; không phải toàn bộ benchmark. Không sinh mẫu trong v1.",
+        "note": "Train đặt sàn lớp; val/test giữ tỷ lệ lớp gốc, tự tăng ngân sách khi thiếu support. "
+                "Không sinh mẫu.",
     })
+    warnings = []
+    if quality["integration_only"]:
+        warnings.append("Profile smoke chỉ kiểm tra tích hợp; không dùng điểm này để kết luận chất lượng mô hình.")
+    for ds, by_split in quality["sampling"].items():
+        for cls, detail in by_split["train"].get("floor_shortfall", {}).items():
+            warnings.append(f"{ds}/train/{cls}: chỉ có {detail['available']} mẫu thật, "
+                            f"thấp hơn sàn {detail['requested']}; giữ toàn bộ, không nhân bản.")
+    quality["warnings"] = warnings
     dump_json(quality, out / "quality_report.json")
+    report = [f"# Chia tập và lấy mẫu — {profile}", "", f"Policy: `{POLICY_VERSION}`. "
+              "Cách chia chỉ dùng nhãn/counts, không dùng điểm mô hình.", "",
+              "| Nguồn | Tập | BENIGN | DOS_DDOS | OTHER_ATTACK | Tổng |", "|---|---|---:|---:|---:|---:|"]
+    for ds, by_split in quality["used_counts"].items():
+        for sp in SPLITS:
+            counts = by_split[sp]
+            report.append(f"| {ds} | {sp} | " + " | ".join(f"{counts.get(c, 0):,}" for c in ad.CLASSES) +
+                          f" | {sum(counts.values()):,} |")
+    report.extend(["", "Train đặt sàn rồi phân ngân sách còn lại theo counts gốc. "
+                   "Val/test giữ tỷ lệ lớp gốc, không sinh mẫu hoặc lấp quota bằng lớp khác.", ""])
+    report.extend(f"- {w}" for w in warnings)
+    (out / "sampling_report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     raw_manifest = {}
     for ds in sources:
         mf = root / cfg["sources"][ds]["dir"] / "download_manifest.json"
         raw_manifest[ds] = read_json(mf) if mf.exists() else None
     dump_json({"pipeline": cfg["pipeline"], "clients": manifest_clients,
                "sources": {ds: {"files": s["files"], "download_manifest": raw_manifest[ds],
-                                "split": splits[ds]["info"], "cache": s.get("cache"),
+                                "split": splits[ds]["info"],
                                 "config": cfg["sources"][ds]} for ds, s in sources.items()},
                "conventions": {"cicddos2019": cfg["sources"]["cicddos2019"].get("note", ""),
-                               "unsw_nb15": "test = testing-set chính thức; train/val = 5-fold nhóm fingerprint",
-                               "iot23": "StratifiedGroupKFold 5-fold theo capture trên reservoir"},
+                               "unsw_nb15": "test = testing-set chính thức; train/val = 5-fold nhóm fingerprint"},
+               "sampling_policy": POLICY_VERSION, "sampling_config": caps,
                "hashes": hashes, "created": time.strftime("%Y-%m-%d %H:%M:%S")}, out / "dataset_manifest.json")
     log(f"Xong -> {out}")
     return {"out": str(out), "features": fitted["features"], "hashes": hashes, "clients": manifest_clients,

@@ -4,7 +4,7 @@ Cập nhật: **08/11/2026**, múi giờ Asia/Saigon. Mã nguồn tham chiếu: 
 
 **Người dùng đã chốt 3 client, mỗi client một dataset, và 3 lớp BENIGN / DOS_DDOS / OTHER_ATTACK.** Người dùng cũng đã chọn tự tải và tích hợp hai nguồn còn thiếu. Tài liệu này thay thế kế hoạch sơ bộ trước đó; các thông số kỹ thuật còn lại được chốt thành mặc định triển khai bên dưới.
 
-Trạng thái (08/11/2026): **đã triển khai code bước 1–5 và 7** (downloader, adapter, split/subset, AFN, DAS, artifacts, notebook 03, loader, server FedAvg chọn best bằng validation, đánh giá ba test, baseline, script ma trận); 20 kiểm thử fixture đạt; adapter CIC đã kiểm tra trên 17 Parquet thật (306.201 / 125.170 dòng, không nhãn lạ, đơn vị µs đạt). **Chưa tải UNSW/IoT-23, chưa chạy pipeline/smoke (bước 6) và thí nghiệm chính (bước 8).** Chưa hỗ trợ Modal cho multidataset_v1.
+Trạng thái cập nhật 09/11/2026: đã tải đủ dữ liệu, chuẩn bị smoke/main và DAS/all theo policy `capture_support_v2`, kiểm thử và smoke FL local đạt. Đã bổ sung bộ chạy riêng trên Modal (`modal_multidataset.py`), upload artifact có checksum và smoke gate trước main; xem [hướng dẫn Modal](modal_ba_dataset.md). Thông tin ở các mục sau mô tả thiết kế; trạng thái thí nghiệm cloud được ghi riêng theo run ID.
 
 ## 1. Mục tiêu và phạm vi phiên bản đầu
 
@@ -44,11 +44,11 @@ Hình 14, trang 20 của paper hiển thị Normal / SYN Flood / UDP Flood / HTT
 | Chọn checkpoint | Trung bình đều F1-macro trên các lớp có support của validation ba nguồn |
 | Quy tắc hòa checkpoint | Giữ vòng sớm hơn; không chọn vòng 0 |
 | Ngưỡng metric nhị phân | 0.5, cố định trong v1 |
-| Profile smoke | Mỗi nguồn: tối đa 1.000 train / 500 validation / 1.000 test; 2 vòng × 1 epoch, seed 0 |
-| Profile main | Mỗi nguồn: tối đa 100.000 train / 20.000 validation / 50.000 test |
+| Profile smoke | 1.000 train (sàn 100/lớp), val/test ban đầu 500/1.000, tự tăng để đạt support 3/5; chỉ kiểm tra tích hợp |
+| Profile main | 100.000 train (sàn 10.000/lớp); val 20.000–100.000 (sàn 200/lớp), test 50.000–200.000 (sàn 500/lớp) |
 | Đầu ra mới | data_paper_multi và results_multidataset |
 
-Các giới hạn mẫu được áp dụng sau khi xác định split, lấy mẫu theo tỷ lệ lớp và giữ ít nhất một mẫu của lớp có mặt nếu ngân sách cho phép. Nếu nguồn/split có ít mẫu hơn giới hạn thì giữ toàn bộ, không nhân bản. Báo cáo ghi số mẫu gốc và số mẫu sử dụng; không gọi subset test là toàn bộ benchmark.
+Policy hiện tại là `capture_support_v2` ([thiết kế chi tiết](chia_capture_va_subset.md)). Train đặt sàn rồi chia ngân sách còn lại theo tỷ lệ lớp. Lớp có ít mẫu thật hơn sàn thì giữ toàn bộ và ghi cảnh báo, không nhân bản. Val/test giữ tỷ lệ tự nhiên và tăng ngân sách để đủ support; không đáp ứng được thì dừng. Báo cáo ghi số mẫu gốc và số mẫu sử dụng; không gọi subset test là toàn bộ benchmark.
 
 V1 không sinh mẫu. CTA, DPCA, TEC, MTB theo thời gian, NDS/JAA và DRA/LIS không nằm trên đường chạy mặc định mới. Điều này tránh dùng thời gian giả, nội suy protocol hoặc làm tăng mạnh lớp hiếm trước khi có baseline ba nguồn hợp lệ. Các hàm cũ được giữ phục vụ pipeline CIC và các mở rộng sau; không thay chúng bằng Spearman hoặc phương pháp chọn đặc trưng khác.
 
@@ -89,7 +89,7 @@ Khi dùng bản sao, khóa URL theo commit repository, ghi rõ mirror trong mani
 - Kiểm tra dung lượng trống tối thiểu bằng kích thước tải còn lại cộng 8 GiB cho cache/output; báo trước phần thiếu nếu không đủ.
 - Đọc tar.gz theo luồng, chỉ xử lý file nhãn/README cần thiết, không giải nén toàn bộ archive ra ổ D.
 - Mỗi capture được đọc theo batch khoảng 100.000 dòng, thống kê đầy đủ và giữ reservoir theo lớp với hash ổn định.
-- Giữ tối đa 100.000 ứng viên mỗi capture/lớp, ghi cache Parquet theo capture rồi giải phóng RAM. Mức này đủ để chọn subset main tối đa 100.000 dòng một split.
+- Giữ tối đa 100.000 ứng viên mỗi capture/lớp, ghi cache Parquet theo capture rồi giải phóng RAM. Quota theo counts gốc được kiểm tra với lượng cache từng capture/lớp; thiếu thì dừng và yêu cầu tăng reservoir, không chuyển quota sang capture/lớp khác trong val/test.
 - Sau khi chọn split, phân bổ quota lớp theo số dòng hợp lệ gốc của split, rồi chọn các hash nhỏ nhất từ reservoir. Cách này không làm các capture lớn và nhỏ có trọng số bằng nhau một cách ngầm định.
 - Lưu counts đầy đủ, seed, ID mẫu được giữ, checksum và phiên bản parser. Cache hợp lệ được tái sử dụng; cache sai checksum/schema phải được tạo lại có chỉ dẫn rõ.
 - Tải có thể tiếp tục; việc đọc gzip có thể phải đọc lại từ đầu nếu bị ngắt. Không hứa khả năng tiếp tục parser ở byte bất kỳ của gzip.
@@ -187,17 +187,17 @@ feature_selection.csv ghi tên cột, relevance pooled/theo nguồn, thứ hạn
 |---|---|---|
 | CIC | Toàn bộ nguồn *-training theo quy ước hiện tại, sau kiểm tra chất lượng và lấy subset profile | Nguồn *-testing: khoảng 80/20 theo nhóm fingerprint, phân tầng nhãn |
 | UNSW | CSV testing-set chính thức | CSV training-set: khoảng 80/20 theo nhóm fingerprint, phân tầng nhãn |
-| IoT | Một fold nhóm capture của StratifiedGroupKFold 5-fold | Một fold validation, ba fold còn lại train; gần 60/20/20 về nhóm, số dòng thực tế phụ thuộc capture |
+| IoT | Nhóm capture được phân trực tiếp bằng MILP | Train/val/test không giao capture; tối ưu theo counts gốc và support đánh giá trong ngân sách |
 
 Với CIC/UNSW, fingerprint dùng các phép đo flow raw sẵn có, loại ID/label và metadata định danh; không chỉ dùng bốn cột chung. Các vector trùng là nhóm để hạn chế trùng giữa train/validation, không được diễn giải thành cùng một phiên mạng thật.
 
-Với IoT, StratifiedGroupKFold chạy trên reservoir ứng viên có capture_id và y, seed 42. Thử các cặp fold test/validation theo thứ tự chỉ số; chọn cặp đầu tiên có đủ ba lớp ở train, validation và test của IoT. Quyết định chỉ dùng nhãn/coverage, không dùng dự đoán hoặc điểm mô hình. Sau đó ghi counts thực tế của toàn bộ các capture thuộc mỗi split. Nếu không tồn tại cặp thỏa coverage thì báo lỗi kèm bảng capture/lớp; không lén chuyển sang random flow split.
+Với IoT, MILP phân trực tiếp capture, seed 42, thiết kế bằng profile main dùng chung cho smoke/main và các kiến trúc. Ràng buộc cứng gồm capture độc lập, ít nhất ba capture/tập, đủ ứng viên train và tỷ lệ lớp cho phép đạt support val/test trong ngân sách tối đa. Mục tiêu mềm gồm kích thước gần 60/20/20, phân bố lớp và ít nhất hai capture có support đáng kể mỗi lớp/tập. Chỉ dùng nhãn/counts, không dùng điểm mô hình. Kiểm tra quota và cache sau khi giải; nếu không đạt thì báo lỗi, không chuyển sang random flow split. Số capture thực đóng góp và cảnh báo thiếu đa dạng được lưu trong quality_report.
 
 Train/validation CIC và UNSW dùng cùng cách chọn fold 5-fold theo nhóm, chọn fold validation đầu tiên có đủ lớp của nguồn trong cả train và validation. Split manifest lưu cặp seed/nhóm/dòng để mọi kiến trúc và seed huấn luyện dùng lại.
 
 ### 7.2. Kiểm tra độc lập và profile
 
-- Chia tập trước fit/sinh mẫu. Lấy subset theo quota lớp từ counts gốc của từng split, lựa chọn bằng hash seed 42, cùng ID được tái sử dụng cho các thí nghiệm so sánh.
+- Chia tập trước fit/sinh mẫu. Train đặt sàn lớp rồi phân quota; val/test theo tỷ lệ gốc. IoT phân quota tiếp theo capture trong mỗi lớp trước khi chọn bottom-k hash seed 42, tránh cache cân bằng theo capture làm lệch mẫu. Cùng ID được tái sử dụng cho các thí nghiệm so sánh.
 - Nhóm train/validation không giao nhau; capture IoT không xuất hiện ở nhiều split.
 - Các ID trùng của cùng flow phải được phát hiện. Overlap vector với test chính thức được báo riêng; vector giống nhau không tự chứng minh cùng sự kiện hoặc rò rỉ nhãn.
 - Không sửa âm thầm test chính thức hoặc chuyển mẫu test sang train để cải thiện coverage.

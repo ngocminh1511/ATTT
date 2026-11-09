@@ -71,7 +71,7 @@ def make_evaluate_fn(test, n_params, n_clients, arch, dropout):
 def main(grid: Grid, context: Context) -> None:
     rc = context.run_config
     paths.configure(str(rc.get("data-dir", "")), str(rc.get("results-dir", "")))
-    if is_multi():  # 3 client × 3 nguồn: chọn checkpoint bằng validation, không đánh giá test trong lúc train
+    if is_multi():  # 2 client × 2 nguồn: chọn checkpoint bằng validation, không đánh giá test trong lúc train
         return run_multidataset(grid, context)
     seed, mu, sc =int(rc["seed"]), float(rc["proximal-mu"]), str(rc["scenario"])
     strategy_name, poison = str(rc["strategy"]), str(rc.get("poison-clients", ""))

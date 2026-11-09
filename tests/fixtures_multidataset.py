@@ -1,8 +1,5 @@
-"""Fixture nhỏ mô phỏng định dạng gốc của ba nguồn (chỉ để kiểm thử logic, không phải kết quả học)."""
+"""Fixture nhỏ mô phỏng định dạng gốc của hai nguồn (chỉ để kiểm thử logic, không phải kết quả học)."""
 import copy
-import io
-import json
-import tarfile
 from pathlib import Path
 
 import numpy as np
@@ -43,33 +40,7 @@ def unsw_frame(rng, n, start_id):
                          "attack_cat": cats, "label": (np.char.strip(cats.astype(str)) != "Normal").astype(int)})
 
 
-IOT_FIELDS = ["ts", "uid", "id.orig_h", "id.orig_p", "id.resp_h", "id.resp_p", "proto", "service", "duration",
-              "orig_bytes", "resp_bytes", "conn_state", "local_orig", "local_resp", "missed_bytes", "history",
-              "orig_pkts", "orig_ip_bytes", "resp_pkts", "resp_ip_bytes", "tunnel_parents", "label", "detailed-label"]
-IOT_LABELS = [("Benign", "-"), ("Malicious", "DDoS"), ("Malicious", "PartOfAHorizontalPortScan"),
-              ("Malicious", "C&C-HeartBeat"), ("Malicious", "Okiru")]
-
-
-def zeek_log(rng, n, merged: bool, extra_labels=()) -> bytes:
-    lines = ["#separator \\x09", "#set_separator\t,", "#empty_field\t(empty)", "#unset_field\t-",
-             "#path\tconn", "#open\t2019-01-01-00-00-00", "#fields\t" + "\t".join(IOT_FIELDS[:-3]) +
-             "\ttunnel_parents   label   detailed-label",
-             "#types\t" + "\t".join(["time"] + ["string"] * 19) + "\tset[string]   string   string"]
-    pool = IOT_LABELS + list(extra_labels)
-    for i in range(n):
-        lab, det = pool[i % len(pool)]
-        dur = "-" if i % 7 == 0 else f"{rng.random() * 10:.6f}"
-        row = [f"{1.5e9 + i:.6f}", f"C{i:08d}", "192.168.1.1", "1234", "10.0.0.1", "80",
-               rng.choice(["tcp", "udp", "icmp"]), "-", dur, "0", "0", "S0", "-", "-", "0", "S",
-               str(int(rng.integers(1, 20))), "100", str(int(rng.integers(0, 20))), "0"]
-        tail = ["(empty)", lab, det]
-        lines.append("\t".join(row) + ("\t" + "   ".join(tail) if merged else "\t" + "\t".join(tail)))
-    lines.append("#close\t2019-01-01-01-00-00")
-    return ("\n".join(lines) + "\n").encode()
-
-
-def build(root: Path, seed: int = 0, n_captures: int = 6, rows_per_capture: int = 300,
-          iot_extra_labels=(), cic_labels_train=("Benign", "DrDoS_DNS", "Syn"),
+def build(root: Path, seed: int = 0, cic_labels_train=("Benign", "DrDoS_DNS", "Syn"),
           cic_labels_test=("Benign", "LDAP", "Syn")) -> dict:
     rng = np.random.default_rng(seed)
     cfg = copy.deepcopy(base_config())
@@ -86,17 +57,7 @@ def build(root: Path, seed: int = 0, n_captures: int = 6, rows_per_capture: int 
         df.to_csv(un / name, index=False, encoding="utf-8-sig")
     cfg["sources"]["unsw_nb15"]["files"]["train"]["rows"] = len(tr)
     cfg["sources"]["unsw_nb15"]["files"]["test"]["rows"] = len(te)
-    iot = root / "data/raw/iot23"
-    iot.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(iot / cfg["sources"]["iot23"]["archive"], "w:gz") as tar:
-        tar.addfile(tarfile.TarInfo("opt/README.md"), io.BytesIO(b""))
-        for k in range(n_captures):
-            data = zeek_log(rng, rows_per_capture + 17 * k, merged=k % 2 == 0, extra_labels=iot_extra_labels)
-            ti = tarfile.TarInfo(f"opt/Malware-Project/BigDataset/IoTScenarios/CTU-IoT-Malware-Capture-{k}-1/bro/"
-                                 "conn.log.labeled")
-            ti.size = len(data)
-            tar.addfile(ti, io.BytesIO(data))
-    cfg["split"]["iot_reservoir_per_capture_class"] = 50
-    cfg["split"]["iot_batch_rows"] = 64
-    cfg["profiles"]["tiny"] = {"train": 200, "val": 80, "test": 120}
+    cfg["profiles"]["tiny"] = {"train": 200, "val": 80, "test": 120, "train_min_per_class": 10,
+                                "eval_min_per_class": {"val": 5, "test": 5},
+                                "eval_max_samples": {"val": 120, "test": 180}}
     return cfg

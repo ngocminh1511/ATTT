@@ -17,11 +17,13 @@ dependencies = [
     "pandas>=2.2",
     "pyarrow>=15",
     "scikit-learn>=1.4",
+    "scipy>=1.11",
     "matplotlib>=3.8",
 ]
 
 [project.optional-dependencies]
 notebook = ["ipykernel", "nbformat", "nbclient"]
+cloud = ["modal>=1.6,<2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["fl_ddos"]
