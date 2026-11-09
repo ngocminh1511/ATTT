@@ -1,8 +1,8 @@
 {
   "scenario": "multidataset",
   "pipeline": "multidataset_v1",
-  "schema_version": "canonical4_v1",
-  "parser_version": "adapters_v1",
+  "schema_version": "canonical8_v1",
+  "parser_version": "adapters_v2",
   "prep_seed": 42,
   "train_seeds": [0],
   "classes": ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"],
@@ -82,7 +82,7 @@
     "group_kfold_seed": 42
   },
   "afn": {"group": "protocol_group"},
-  "das": {"theta": 0.001, "gamma": 0.9, "max_continuous": 8},
+  "das": {"theta": 0.001, "gamma": 0.9, "max_continuous": 12},
   "class_weight_clip": [0.1, 10.0],
   "fl": {
     "arch": "resvgg_swin", "lr": 0.001, "batch_size": 64, "dropout": 0.3,

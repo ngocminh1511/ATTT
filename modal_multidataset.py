@@ -1,4 +1,4 @@
-r"""Modal: upload artifact đã chốt -> smoke gate -> 6 FL + 2 baseline main.
+r"""Modal: upload artifact đã chốt -> smoke gate -> 2 FL (DAS/all, seed 0) + 2 baseline main.
 
   .venv\Scripts\modal.exe run --detach modal_multidataset.py
   .venv\Scripts\modal.exe run --detach modal_multidataset.py --smoke-only

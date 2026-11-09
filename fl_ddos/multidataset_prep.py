@@ -1,7 +1,7 @@
 """Pipeline dữ liệu multidataset_v1: 2 client (CIC-DDoS2019, UNSW-NB15) × 3 lớp.
 
 Thứ tự: adapter -> kiểm tra nhãn/chất lượng -> chia train/validation/test theo nhóm -> lấy subset theo
-quota lớp (hash seed 42) -> 8 cột liên tục + 6 cột cố định -> log1p -> AFN theo protocol (thống kê
+quota lớp (hash seed 42) -> 17 cột liên tục + 6 cột cố định -> log1p -> AFN theo protocol (thống kê
 train hai client, hỗ trợ missing) -> DAS (CRA + IDF, pooled) -> class weight -> artifacts.
 
 Không sinh mẫu (CTA/DPCA), không TEC/MTB/NDS/JAA/DRA/LIS trong v1 (kế hoạch mục 2).
@@ -23,7 +23,9 @@ from fl_ddos import dataset_adapters as ad
 from fl_ddos.multidataset_sampling import POLICY_VERSION, PrepError, allocate_quota, evaluation_plan, select_subset
 
 CONTINUOUS = ["duration_s", "fwd_packets", "bwd_packets", "total_packets", "flow_packets_s",
-              "fwd_packets_s", "bwd_packets_s", "bwd_packet_fraction"]
+              "fwd_packets_s", "bwd_packets_s", "bwd_packet_fraction",
+              "fwd_bytes", "bwd_bytes", "total_bytes", "flow_bytes_s", "fwd_packet_size_mean",
+              "bwd_packet_size_mean", "bwd_byte_fraction", "fwd_iat_mean_s", "bwd_iat_mean_s"]
 FIXED = ["proto_tcp", "proto_udp", "proto_icmp", "proto_other", "duration_missing", "duration_zero"]
 KEEP_META = ["dataset_id", "capture_id", "row_id", "original_label", "timestamp"]
 EPS = 1e-12
@@ -149,17 +151,29 @@ def split_train_val(pool: pd.DataFrame, n_folds: int, seed: int, dataset_id: str
 
 # ================================================================ đặc trưng
 def derive(frame: pd.DataFrame) -> pd.DataFrame:
-    """8 cột liên tục (rate = missing khi duration không dương/thiếu) + 6 cột cố định 0/1."""
+    """17 cột liên tục (rate = missing khi duration không dương/thiếu; tỷ lệ/kích thước gói = missing khi
+    mẫu số bằng 0) + 6 cột cố định 0/1."""
     d = frame["duration_s"].values.astype(np.float64)
     f, b = frame["fwd_packets"].values.astype(np.float64), frame["bwd_packets"].values.astype(np.float64)
-    tot = f + b
+    fb, bb = frame["fwd_bytes"].values.astype(np.float64), frame["bwd_bytes"].values.astype(np.float64)
+    tot, totb = f + b, fb + bb
     pos = np.isfinite(d) & (d > 0)
+
+    def ratio(num, den):
+        ok = np.isfinite(num) & np.isfinite(den) & (den > 0)
+        return np.where(ok, num / np.where(ok, den, 1.0), np.nan)
+
     with np.errstate(divide="ignore", invalid="ignore"):
         rate = lambda num: np.where(pos, num / np.where(pos, d, 1.0), np.nan)  # noqa: E731
         out = pd.DataFrame({
             "duration_s": d, "fwd_packets": f, "bwd_packets": b, "total_packets": tot,
             "flow_packets_s": rate(tot), "fwd_packets_s": rate(f), "bwd_packets_s": rate(b),
-            "bwd_packet_fraction": np.where(tot > 0, b / np.where(tot > 0, tot, 1.0), np.nan),
+            "bwd_packet_fraction": ratio(b, tot),
+            "fwd_bytes": fb, "bwd_bytes": bb, "total_bytes": totb, "flow_bytes_s": rate(totb),
+            "fwd_packet_size_mean": ratio(fb, f), "bwd_packet_size_mean": ratio(bb, b),
+            "bwd_byte_fraction": ratio(bb, totb),
+            "fwd_iat_mean_s": frame["fwd_iat_mean_s"].values.astype(np.float64),
+            "bwd_iat_mean_s": frame["bwd_iat_mean_s"].values.astype(np.float64),
         }, index=frame.index)
     pg = frame["protocol_group"].astype(str).values
     for g in ad.PROTO_GROUPS:

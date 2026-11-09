@@ -36,6 +36,8 @@ class AdapterTests(unittest.TestCase):
     def test_cic_labels_and_units(self):
         raw = pd.DataFrame({"Protocol": [6, 17, 0], "Flow Duration": [1_000_000, 500_000, 0],
                             "Total Fwd Packets": [3, 2, 1], "Total Backward Packets": [1, 0, 0],
+                            "Fwd Packets Length Total": [300.0, 100.0, 0.0], "Bwd Packets Length Total": [50.0, 0.0, 0.0],
+                            "Fwd IAT Mean": [500_000.0, 0.0, 0.0], "Bwd IAT Mean": [0.0, 0.0, 0.0],
                             "Label": ["Benign", "DrDoS_DNS", "Portmap"]})
         issues, drops = Counter(), Counter()
         df = ad.cic_frame(raw, "x", 0, self.cfg, issues, drops)
@@ -46,11 +48,17 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(feats["flow_packets_s"].iloc[0], 4.0)  # gói/giây
         self.assertTrue(np.isnan(feats["flow_packets_s"].iloc[2]))  # duration = 0 -> rate missing, không Inf
         self.assertEqual(feats["duration_zero"].tolist(), [0, 0, 1])
+        self.assertEqual(feats["fwd_packet_size_mean"].iloc[0], 100.0)  # byte / gói
+        self.assertEqual(feats["fwd_iat_mean_s"].iloc[0], 0.5)  # µs -> s
+        self.assertTrue(np.isnan(feats["fwd_iat_mean_s"].iloc[2]))  # 1 gói -> IAT missing
+        self.assertTrue(np.isnan(feats["bwd_packet_size_mean"].iloc[1]))  # 0 gói chiều về -> missing
         self.assertFalse(issues)
 
     def test_unknown_label_reported(self):
         raw = pd.DataFrame({"Protocol": [6], "Flow Duration": [1], "Total Fwd Packets": [1],
-                            "Total Backward Packets": [1], "Label": ["PortScan"]})
+                            "Total Backward Packets": [1], "Fwd Packets Length Total": [1.0],
+                            "Bwd Packets Length Total": [1.0], "Fwd IAT Mean": [0.0], "Bwd IAT Mean": [0.0],
+                            "Label": ["PortScan"]})
         issues = Counter()
         df = ad.cic_frame(raw, "x", 0, self.cfg, issues, Counter())
         self.assertEqual(df["y"].tolist(), [ad.UNKNOWN])
@@ -155,7 +163,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(feats["pipeline"], "multidataset_v1")
         self.assertEqual(feats["classes"], ad.CLASSES)
         F = len(feats["features"])
-        self.assertTrue(7 <= F <= 14)
+        self.assertTrue(7 <= F <= 6 + 12)
         self.assertEqual(feats["features"][-6:], mp.FIXED)
         for k in (1, 2):
             for name in (f"client_{k}", f"val_client_{k}"):

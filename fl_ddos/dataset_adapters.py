@@ -4,10 +4,16 @@ Mỗi adapter đọc định dạng gốc của một nguồn và trả về cá
 
   metadata (không đưa vào mô hình): dataset_id, capture_id, row_id, original_label, timestamp,
                                      fingerprint, sel_hash, y
-  4 trường cơ sở:                    duration_s, fwd_packets, bwd_packets, protocol_group
+  8 trường cơ sở:                    duration_s, fwd_packets, bwd_packets, fwd_bytes, bwd_bytes,
+                                     fwd_iat_mean_s, bwd_iat_mean_s, protocol_group
 
-  CIC-DDoS2019  Parquet  Flow Duration (µs) / 1e6, Total Fwd/Backward Packets, Protocol (số)
-  UNSW-NB15     CSV      dur (s), spkts, dpkts, proto (chuỗi); nhãn attack_cat + label nhị phân
+  CIC-DDoS2019  Parquet  Flow Duration (µs) / 1e6, Total Fwd/Backward Packets, Fwd/Bwd Packets Length Total,
+                         Fwd/Bwd IAT Mean (µs) / 1e6, Protocol (số)
+  UNSW-NB15     CSV      dur (s), spkts, dpkts, sbytes, dbytes, sinpkt/dinpkt (ms) / 1e3, proto (chuỗi);
+                         nhãn attack_cat + label nhị phân
+
+Lưu ý ngữ nghĩa: byte của CICFlowMeter là tổng độ dài gói theo chiều, của Argus (UNSW) là byte giao dịch;
+hai cách đếm lệch nhau phần header. IAT chỉ xác định khi chiều đó có ít nhất 2 gói, ngược lại là missing.
 
 Nhãn được ánh xạ bằng bảng tường minh trong configs/multidataset.json, không dùng substring tùy ý.
 Nhãn lạ/mâu thuẫn -> y = -1 và một mục trong `issues`; pipeline không xuất artifact khi còn mục này.
@@ -23,7 +29,8 @@ import numpy as np
 import pandas as pd
 
 CLASSES = ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"]
-BASE = ["duration_s", "fwd_packets", "bwd_packets", "protocol_group"]
+BASE = ["duration_s", "fwd_packets", "bwd_packets", "fwd_bytes", "bwd_bytes", "fwd_iat_mean_s", "bwd_iat_mean_s",
+        "protocol_group"]
 META = ["dataset_id", "capture_id", "row_id", "original_label", "timestamp", "fingerprint", "sel_hash", "y"]
 PROTO_GROUPS = ["tcp", "udp", "icmp", "other"]
 UNKNOWN = -1
@@ -72,8 +79,8 @@ def build_label_lookup(label_map: dict, dataset_id: str) -> dict:
 
 
 def finalize(df: pd.DataFrame, drops: Counter) -> pd.DataFrame:
-    """Kiểm tra chất lượng 4 trường cơ sở; loại dòng packet không hợp lệ và ghi lý do theo nhãn gốc."""
-    for c in ("duration_s", "fwd_packets", "bwd_packets"):
+    """Kiểm tra chất lượng trường cơ sở; loại dòng packet không hợp lệ và ghi lý do theo nhãn gốc."""
+    for c in BASE[:-1]:
         df[c] = pd.to_numeric(df[c], errors="coerce").astype(np.float64)
     fwd, bwd = df["fwd_packets"].values, df["bwd_packets"].values
     bad_cnt = ~np.isfinite(fwd) | ~np.isfinite(bwd) | (fwd < 0) | (bwd < 0)
@@ -84,12 +91,19 @@ def finalize(df: pd.DataFrame, drops: Counter) -> pd.DataFrame:
                 drops[(reason, str(lab))] += int(n)
     dur = df["duration_s"].values
     df.loc[~np.isfinite(dur) | (dur < 0), "duration_s"] = np.nan  # âm / sentinel -> missing, không đổi thành 0
+    for c in ("fwd_bytes", "bwd_bytes", "fwd_iat_mean_s", "bwd_iat_mean_s"):
+        v = df[c].values
+        df.loc[~np.isfinite(v) | (v < 0), c] = np.nan
+    df.loc[~(fwd >= 2), "fwd_iat_mean_s"] = np.nan  # IAT cần ít nhất 2 gói cùng chiều
+    df.loc[~(bwd >= 2), "bwd_iat_mean_s"] = np.nan
     return df.loc[~(bad_cnt | bad_tot)].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------- CIC-DDoS2019
 CIC_FIELDS = {"duration_s": "Flow Duration", "fwd_packets": "Total Fwd Packets",
-              "bwd_packets": "Total Backward Packets", "protocol_group": "Protocol"}
+              "bwd_packets": "Total Backward Packets", "fwd_bytes": "Fwd Packets Length Total",
+              "bwd_bytes": "Bwd Packets Length Total", "fwd_iat_mean_s": "Fwd IAT Mean",
+              "bwd_iat_mean_s": "Bwd IAT Mean", "protocol_group": "Protocol"}
 
 
 def cic_frame(raw: pd.DataFrame, source_file: str, start: int, cfg: dict, issues: Counter,
@@ -110,6 +124,9 @@ def cic_frame(raw: pd.DataFrame, source_file: str, start: int, cfg: dict, issues
         "fingerprint": row_fingerprint(measure), "sel_hash": stable_hash(rid, cfg["prep_seed"]), "y": y,
         "duration_s": pd.to_numeric(raw["Flow Duration"], errors="coerce").astype(np.float64).values / 1e6,
         "fwd_packets": raw["Total Fwd Packets"].values, "bwd_packets": raw["Total Backward Packets"].values,
+        "fwd_bytes": raw["Fwd Packets Length Total"].values, "bwd_bytes": raw["Bwd Packets Length Total"].values,
+        "fwd_iat_mean_s": pd.to_numeric(raw["Fwd IAT Mean"], errors="coerce").astype(np.float64).values / 1e6,
+        "bwd_iat_mean_s": pd.to_numeric(raw["Bwd IAT Mean"], errors="coerce").astype(np.float64).values / 1e6,
         "protocol_group": protocol_group(raw["Protocol"].values),
     })
     return finalize(df, drops)
@@ -130,7 +147,7 @@ def cic_unit_check(raw: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------- UNSW-NB15
-UNSW_REQUIRED = ["id", "dur", "proto", "spkts", "dpkts", "attack_cat", "label"]
+UNSW_REQUIRED = ["id", "dur", "proto", "spkts", "dpkts", "sbytes", "dbytes", "sinpkt", "dinpkt", "attack_cat", "label"]
 
 
 def looks_like_html(head: bytes) -> bool:
@@ -173,6 +190,9 @@ def unsw_frame(raw: pd.DataFrame, split: str, cfg: dict, issues: Counter, drops:
         "original_label": cat.values, "timestamp": np.nan,
         "fingerprint": row_fingerprint(measure), "sel_hash": stable_hash(rid, cfg["prep_seed"]), "y": y,
         "duration_s": raw["dur"].values, "fwd_packets": raw["spkts"].values, "bwd_packets": raw["dpkts"].values,
+        "fwd_bytes": raw["sbytes"].values, "bwd_bytes": raw["dbytes"].values,
+        "fwd_iat_mean_s": pd.to_numeric(raw["sinpkt"], errors="coerce").astype(np.float64).values / 1e3,
+        "bwd_iat_mean_s": pd.to_numeric(raw["dinpkt"], errors="coerce").astype(np.float64).values / 1e3,
         "protocol_group": protocol_group(raw["proto"].values),
     })
     return finalize(df, drops)

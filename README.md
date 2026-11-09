@@ -23,7 +23,7 @@ Pipeline cũ (FL + Suricata, mô tả trong file `.docx` ở `docs/`) đã bỏ 
 | `prepare/preprocess_csv.py`, `split_clients.py`, `federated_scaler.py`, `make_synthetic.py` | — | Pipeline cũ (mục 6) |
 | `scripts/` | — | `fl_run.*` (bọc `flwr run`), `run_all.*` (ma trận cũ E1–E5) |
 | `configs/multidataset.json` | — | multidataset_v1: nguồn tải, bảng nhãn, profile smoke/main, split, AFN, DAS |
-| `fl_ddos/dataset_adapters.py` | — | Parser CIC Parquet / UNSW CSV, nhãn 3 lớp, schema 4 trường |
+| `fl_ddos/dataset_adapters.py` | — | Parser CIC Parquet / UNSW CSV, nhãn 3 lớp, schema 8 trường |
 | `fl_ddos/multidataset_prep.py` | 3.2, 3.5 | Reservoir, split theo nhóm, quota, log1p + AFN có missing, DAS pooled, transform, artifacts |
 | `fl_ddos/multidataset_server.py`, `multidataset_eval.py` | — | FedAvg 3 nguồn, chọn best bằng validation; đánh giá một checkpoint trên 3 test |
 | `prepare/download_datasets.py`, `prepare/multidataset_pipeline.py` | — | Tải/kiểm tra raw; CLI pipeline |
@@ -211,9 +211,10 @@ Chưa có dataset thì chạy `python prepare/make_synthetic.py` rồi `preproce
 | 2 | 1 | UNSW-NB15 | testing-set chính thức |
 
 Đầu ra 0 = BENIGN, 1 = DOS_DDOS (gộp DoS của UNSW và DDoS của CIC), 2 = OTHER_ATTACK (chỉ có ở UNSW; client CIC
-có class weight = 0 cho lớp này). Đầu vào: 4 trường cơ sở (`duration_s`, `fwd_packets`, `bwd_packets`,
-`protocol_group`) -> 8 cột liên tục (log1p + AFN theo protocol, missing -> 0) qua DAS (θ = 0,001, γ = 0,9,
-tối đa 8) + 6 cột cố định (one-hot protocol, cờ duration thiếu/bằng 0), nên F = 7–14. Không sinh mẫu.
+có class weight = 0 cho lớp này). Đầu vào: dữ liệu gốc có 77 (CIC) và 42 (UNSW) đặc trưng; schema chung giữ
+8 trường có ở cả hai (`duration_s`, gói / byte / IAT trung bình theo từng chiều, `protocol_group`) -> 17 cột liên tục
+(log1p + AFN theo protocol, missing -> 0) qua DAS (θ = 0,001, γ = 0,9, tối đa 12) + 6 cột cố định (one-hot protocol,
+cờ duration thiếu/bằng 0), nên F = 7–18. Byte của CICFlowMeter và Argus lệch nhau phần header. Không sinh mẫu.
 Best checkpoint chọn bằng TB đều F1-macro-present của hai validation (không đọc test trong lúc train).
 
 Train/val tách bằng 5-fold theo nhóm fingerprint (vector trùng nhau không nằm ở cả train và val); test là tập

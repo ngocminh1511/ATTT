@@ -23,6 +23,8 @@ def cic_frame(rng, n, labels):
     df = pd.DataFrame({"Protocol": proto, "Flow Duration": dur, "Total Fwd Packets": f, "Total Backward Packets": b,
                        "Fwd Packets Length Total": rng.integers(0, 9000, n).astype(float),
                        "Bwd Packets Length Total": rng.integers(0, 9000, n).astype(float),
+                       "Fwd IAT Mean": rng.integers(0, 100_000, n).astype(float),
+                       "Bwd IAT Mean": rng.integers(0, 100_000, n).astype(float),
                        "Flow Packets/s": (f.astype(float) + b) / dur * 1e6, "Label": lab})
     df["Label"] = df["Label"].astype("category")
     return df
@@ -37,6 +39,7 @@ def unsw_frame(rng, n, start_id):
                          "proto": rng.choice(["tcp", "udp", "arp", "icmp"], n), "service": "-", "state": "FIN",
                          "spkts": s, "dpkts": d, "sbytes": s * 60, "dbytes": d * 60,
                          "rate": np.where(dur > 0, (s + d - 1) / np.where(dur > 0, dur, 1), 0),
+                         "sinpkt": np.round(rng.random(n) * 100, 3), "dinpkt": np.round(rng.random(n) * 100, 3),
                          "attack_cat": cats, "label": (np.char.strip(cats.astype(str)) != "Normal").astype(int)})
 
 
