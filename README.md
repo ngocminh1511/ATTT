@@ -251,7 +251,7 @@ Chạy trên Modal bằng `modal_multidataset.py` (file `modal_app.py` dành cho
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[cloud]"
 # Upload đúng artifact smoke/main và DAS/all đã chuẩn bị, kiểm tra SHA-256 trên cloud.
-# Smoke đạt mới tự chạy main: 2 FL (DAS/all × seed 0) + 2 baseline, tối đa 2 GPU đồng thời.
+# Smoke đạt mới tự chạy main: 2 FL (DAS/all × seed 0) + 2 baseline, tối đa 4 GPU A100 đồng thời.
 .\.venv\Scripts\modal.exe run --detach modal_multidataset.py
 # Chỉ kiểm tra tích hợp trên Modal:
 .\.venv\Scripts\modal.exe run --detach modal_multidataset.py --smoke-only

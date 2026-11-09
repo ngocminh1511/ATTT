@@ -17,7 +17,7 @@ Không chia tập, fit tiền xử lý hay lấy subset lại trên Modal.
 
 ## Thí nghiệm
 
-GPU fallback L4/A10G/T4, tối đa 2 experiment container đồng thời, mỗi container 4 CPU/16 GiB RAM.
+GPU A100 (fallback A100-80GB), tối đa 4 experiment container đồng thời, mỗi container 4 CPU/16 GiB RAM.
 Mỗi experiment dùng một GPU; hai Flower client chạy lần lượt, mỗi round đều có đủ hai client.
 
 Smoke gồm FL DAS và all (seed 0, 2 vòng × 1 epoch), centralized và local-only (2 epoch).

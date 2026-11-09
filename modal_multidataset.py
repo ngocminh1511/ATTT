@@ -29,8 +29,8 @@ ROOT = Path(__file__).resolve().parent
 REMOTE = "/root/project"
 VOL = "/vol"
 VOLUME_NAME = "fl-ddos-multidataset"
-MAX_GPU_CONTAINERS = 2
-GPU = ["L4", "A10G", "T4"]
+MAX_GPU_CONTAINERS = 4
+GPU = ["A100", "A100-80GB"]
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .uv_pip_install("torch==2.14.1", "flwr[simulation]==1.40.0", "ray==2.55.1", "numpy==2.5.4",
