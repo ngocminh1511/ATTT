@@ -43,8 +43,43 @@ def remote_size(url: str, timeout: int) -> int | None:
         return int(cl) if cl and r.status == 200 else None
 
 
+class _Stalled(Exception):
+    """Kết nối còn mở nhưng tốc độ quá thấp (server bóp băng thông một kết nối)."""
+
+
+def _fetch(url, part: Path, have: int, total, timeout, chunk, min_rate, name) -> bool:
+    """Tải một lượt từ byte `have`; ném _Stalled nếu trong 60 s nhận < min_rate·60 byte."""
+    headers = dict(UA)
+    if have:
+        headers["Range"] = f"bytes={have}-"
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=timeout) as r:
+        if have and r.status != 206:  # server bỏ qua Range -> tải lại từ đầu
+            print(f"  server không tiếp tục được (HTTP {r.status}); tải lại từ đầu")
+            have = 0
+        done, t_print = have, time.time()
+        t_win, b_win = time.time(), 0
+        with open(part, "ab" if have else "wb") as fh:
+            while True:
+                b = r.read1(chunk)
+                if not b:
+                    return True
+                fh.write(b)
+                done += len(b)
+                b_win += len(b)
+                now = time.time()
+                if now - t_print > 15:
+                    pct = f"{done / total * 100:5.1f}%" if total else ""
+                    print(f"  {name}: {done / 2**20:,.0f} MiB {pct} ({b_win / max(now - t_win, 1e-9) / 2**20:.2f} MiB/s)",
+                          flush=True)
+                    t_print = now
+                if now - t_win > 60:
+                    if b_win < min_rate * (now - t_win):
+                        raise _Stalled(f"{b_win / (now - t_win) / 1024:.0f} KiB/s")
+                    t_win, b_win = now, 0
+
+
 def download(url: str, dest: Path, timeout: int, chunk: int, expected: int | None = None,
-             margin_bytes: int = 0) -> Path:
+             margin_bytes: int = 0, min_rate: int = 100 * 1024, max_retries: int = 200) -> Path:
     """Tải về dest.part, tiếp tục từ byte đã có nếu server hỗ trợ Range; đổi tên sau khi đủ."""
     part = dest.with_name(dest.name + ".part")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -65,27 +100,17 @@ def download(url: str, dest: Path, timeout: int, chunk: int, expected: int | Non
         if have == total:
             part.rename(dest)
             return dest
-    headers = dict(UA)
-    if have:
-        headers["Range"] = f"bytes={have}-"
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        if have and r.status != 206:  # server bỏ qua Range -> tải lại từ đầu
-            print(f"  server không tiếp tục được (HTTP {r.status}); tải lại từ đầu")
-            have = 0
-        mode = "ab" if have else "wb"
-        t0, done = time.time(), have
-        with open(part, mode) as fh:
-            while True:
-                b = r.read(chunk)
-                if not b:
-                    break
-                fh.write(b)
-                done += len(b)
-                if time.time() - t0 > 10:
-                    pct = f"{done / total * 100:5.1f}%" if total else ""
-                    print(f"  {dest.name}: {done / 2**20:,.0f} MiB {pct}", flush=True)
-                    t0 = time.time()
+    for attempt in range(1, max_retries + 1):
+        have = part.stat().st_size if part.exists() else 0
+        if total is not None and have >= total:
+            break
+        try:
+            if _fetch(url, part, have, total, timeout, chunk, min_rate, dest.name):
+                break  # server đóng luồng bình thường
+        except (urllib.error.URLError, OSError, _Stalled) as e:
+            print(f"  lần {attempt}/{max_retries}: {type(e).__name__}: {e} -> kết nối lại, tiếp tục từ "
+                  f"{(part.stat().st_size if part.exists() else 0) / 2**20:,.0f} MiB", flush=True)
+            time.sleep(min(5 * attempt, 60))
     size = part.stat().st_size
     if total is not None and size != total:
         raise SystemExit(f"{dest.name}: tải được {size} byte, server báo {total}. Chạy lại để tiếp tục.")
