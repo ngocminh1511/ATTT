@@ -119,7 +119,9 @@ def method_name(ck: dict) -> str:
     if ck.get("method"):
         return ck["method"]
     fs = meta().get("feature_set", "das")
-    return f"FL · {ck['arch']} · {'DAS' if fs == 'das' else 'all-continuous'}"
+    mu = float(ck.get("run_config", {}).get("proximal-mu", 0) or 0)
+    algo = f"FL FedProx μ={mu:g}" if mu > 0 else "FL"
+    return f"{algo} · {ck['arch']} · {'DAS' if fs == 'das' else 'all-continuous'}"
 
 
 def _replace_rows(file: Path, new: pd.DataFrame, key="checkpoint_sha256"):

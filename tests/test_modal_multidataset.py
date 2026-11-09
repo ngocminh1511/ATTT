@@ -22,11 +22,15 @@ class ModalJobTests(unittest.TestCase):
     def test_matrix_and_training_budget(self):
         main = jobs.make_specs(self.cfg, "main")
         smoke = jobs.make_specs(self.cfg, "smoke")
-        self.assertEqual(len(main), 4)
-        self.assertEqual(len(smoke), 4)
-        self.assertEqual(len({s["name"] for s in main}), 4)
-        self.assertEqual({(s["variant"], s["seed"]) for s in main if s["kind"] == "fl"},
-                         {(v, seed) for v in ("das", "all") for seed in (0,)})
+        self.assertEqual(len(main), 5)
+        self.assertEqual(len(smoke), 5)
+        self.assertEqual(len({s["name"] for s in main}), 5)
+        self.assertEqual({(s["variant"], s["seed"], s.get("mu", 0)) for s in main if s["kind"] == "fl"},
+                         {("das", 0, 0), ("all", 0, 0), ("das", 0, self.cfg["fl"]["fedprox_mu"])})
+        only = jobs.make_specs(self.cfg, "main", {"fl_das_fedprox_seed0"})
+        self.assertEqual([s["name"] for s in only], ["fl_das_fedprox_seed0"])
+        with self.assertRaises(ValueError):
+            jobs.make_specs(self.cfg, "main", {"khong_co"})
         self.assertTrue(all(s["rounds"] == 30 and s["epochs"] == 5 for s in main))
         self.assertEqual({s["baseline_epochs"] for s in main if s["kind"] != "fl"}, {150})
         self.assertEqual({s["baseline_epochs"] for s in smoke if s["kind"] != "fl"}, {2})
@@ -38,6 +42,11 @@ class ModalJobTests(unittest.TestCase):
                 self.assertIn("scenario='multidataset'", cmds[0][-1])
                 self.assertIn("num-clients=2", cmds[0][-1])
                 self.assertIn("num-supernodes=2", cmds[0][-3])
+                if spec.get("mu"):
+                    self.assertIn(f"proximal-mu={spec['mu']}", cmds[0][-1])
+                    self.assertIn("tag-suffix='_fedprox_mu", cmds[0][-1])
+                else:
+                    self.assertIn("proximal-mu=0.0", cmds[0][-1])
                 self.assertEqual(cmds[1][-1], "/tmp/output/fl/*_best.pt")
                 self.assertNotIn("*_last.pt", " ".join(cmds[1]))
             else:
@@ -123,7 +132,7 @@ class SmokeGateTests(unittest.TestCase):
         result, calls = self.run_controller(False)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(calls, ["smoke", "main"])
-        self.assertEqual(len(result["jobs"]), 8)
+        self.assertEqual(len(result["jobs"]), 10)
 
 
 if __name__ == "__main__":

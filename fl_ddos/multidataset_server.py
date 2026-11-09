@@ -125,8 +125,9 @@ def run_multidataset(grid: Grid, context: Context) -> None:
     n_clients, n_rounds = int(rc["num-clients"]), int(rc["num-server-rounds"])
     if n_clients != len(EXPECTED_PIDS):
         raise FLRunError(f"multidataset_v1 cần đúng {len(EXPECTED_PIDS)} client, run config có num-clients={n_clients}")
-    if float(rc.get("proximal-mu", 0)) or str(rc.get("strategy", "fedavg")) != "fedavg" or rc.get("poison-clients"):
-        raise FLRunError("multidataset_v1 chỉ hỗ trợ FedAvg không poison/FedProx trong v1")
+    # FedProx = FedAvg ở server + số hạng proximal mu/2·‖w − w_global‖² ở client (fl_ddos/task.py: train).
+    if str(rc.get("strategy", "fedavg")) != "fedavg" or rc.get("poison-clients"):
+        raise FLRunError("multidataset_v1 chỉ hỗ trợ FedAvg/FedProx, không poison/trimmed")
     pmap = pid_map()
     tag = f"multidataset_{arch}_seed{seed}" + str(rc.get("tag-suffix", ""))
     out = paths.RESULTS / "fl"

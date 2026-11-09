@@ -107,7 +107,7 @@ def report(run_id: str, statuses: list[dict], profile: str):
 
 
 @app.function(cpu=.5, memory=2048, volumes={VOL: vol}, timeout=24 * 3600, retries=0)
-def run_all(bundle: dict, cfg: dict, run_id: str, smoke_only: bool = False):
+def run_all(bundle: dict, cfg: dict, run_id: str, smoke_only: bool = False, only: list | None = None):
     vol.reload()
     run_root = Path(VOL, "runs", run_id)
     verify_bundle(Path(VOL, "datasets", bundle["bundle_id"]), bundle)
@@ -124,7 +124,7 @@ def run_all(bundle: dict, cfg: dict, run_id: str, smoke_only: bool = False):
     persist()
     try:
         for profile in (["smoke"] if smoke_only else ["smoke", "main"]):
-            specs = make_specs(cfg, profile)
+            specs = make_specs(cfg, profile, set(only) if only else None)
             state.update(state=f"{profile}_running", current_profile=profile, planned_jobs=specs)
             persist()
             results = []
@@ -150,8 +150,12 @@ def run_all(bundle: dict, cfg: dict, run_id: str, smoke_only: bool = False):
 
 
 @app.local_entrypoint()
-def main(smoke_only: bool = False):
+def main(smoke_only: bool = False, only: str = ""):
+    """--only fl_das_fedprox_seed0[,tên khác]: chỉ chạy các job đó (smoke rồi main)."""
+    only_jobs = [s for s in only.split(",") if s]
     cfg = read_json(ROOT / "configs/multidataset.json")
+    for profile in ("smoke", "main"):
+        make_specs(cfg, profile, set(only_jobs) or None)  # báo lỗi sớm nếu tên job sai
     data_root = ROOT / cfg["paths"]["out"]
     bundle = build_bundle(data_root)
     remote_manifest = f"/datasets/{bundle['bundle_id']}/bundle_manifest.json"
@@ -168,9 +172,9 @@ def main(smoke_only: bool = False):
         with vol.batch_upload() as batch:
             batch.put_file(io.BytesIO(json.dumps(bundle, ensure_ascii=False).encode()), remote_manifest)
     run_id = datetime.now(timezone(timedelta(hours=7))).strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
-    call = run_all.spawn(bundle, cfg, run_id, smoke_only)
+    call = run_all.spawn(bundle, cfg, run_id, smoke_only, only_jobs)
     launch = {"run_id": run_id, "bundle_id": bundle["bundle_id"], "app_id": app.app_id,
-              "call_id": call.object_id, "volume": VOLUME_NAME, "smoke_only": smoke_only,
+              "call_id": call.object_id, "volume": VOLUME_NAME, "smoke_only": smoke_only, "only": only_jobs,
               "remote_status": f"/runs/{run_id}/status.json",
               "download": f"modal volume get {VOLUME_NAME} /runs/{run_id} ./results_modal_multidataset/{run_id}"}
     save_json(ROOT / "logs" / f"modal_multidataset_{run_id}.json", launch)

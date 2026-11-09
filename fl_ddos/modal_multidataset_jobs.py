@@ -87,17 +87,27 @@ def verify_bundle(root: Path, bundle: dict, name: str | None = None):
             raise ValueError(f"Artifact không khớp SHA-256: {relative}")
 
 
-def make_specs(cfg: dict, profile: str) -> list[dict]:
+def make_specs(cfg: dict, profile: str, only=None) -> list[dict]:
+    """only: tập tên job cần chạy (vd {"fl_das_fedprox_seed0"}); None = toàn bộ ma trận."""
     p = cfg["profiles"][profile]
     common = {"profile": profile, "arch": cfg["fl"]["arch"], "rounds": p["rounds"],
               "epochs": p["local_epochs"], "lr": cfg["fl"]["lr"],
               "batch_size": cfg["fl"]["batch_size"], "dropout": cfg["fl"]["dropout"]}
     specs = [{**common, "variant": v, "kind": "fl", "seed": seed, "name": f"fl_{v}_seed{seed}"}
              for v in VARIANTS for seed in p["seeds"]]
+    mu = float(cfg["fl"].get("fedprox_mu", 0))
+    if mu > 0:
+        specs += [{**common, "variant": "das", "kind": "fl", "seed": seed, "mu": mu,
+                   "name": f"fl_das_fedprox_seed{seed}"} for seed in p["seeds"]]
     baseline_epochs = p["rounds"] * p["local_epochs"] if profile == "smoke" else cfg["fl"]["baseline_epochs"]
     specs += [{**common, "variant": "das", "kind": kind, "seed": p["seeds"][0],
                "baseline_epochs": baseline_epochs, "name": f"{kind}_das_seed{p['seeds'][0]}"}
               for kind in ("centralized", "local")]
+    if only:
+        unknown = set(only) - {s["name"] for s in specs}
+        if unknown:
+            raise ValueError(f"Job không có trong ma trận {profile}: {sorted(unknown)}")
+        specs = [s for s in specs if s["name"] in only]
     return specs
 
 
@@ -106,7 +116,8 @@ def commands(spec: dict, data: str, output: str, python: str) -> list[list[str]]
         config = (f"scenario='multidataset' data-dir='{data}' results-dir='{output}' num-clients={len(DATASETS)} "
                   f"arch='{spec['arch']}' seed={spec['seed']} num-server-rounds={spec['rounds']} "
                   f"local-epochs={spec['epochs']} lr={spec['lr']} batch-size={spec['batch_size']} "
-                  f"dropout={spec['dropout']} strategy='fedavg' proximal-mu=0.0")
+                  f"dropout={spec['dropout']} strategy='fedavg' proximal-mu={float(spec.get('mu', 0.0))}"
+                  + (f" tag-suffix='_fedprox_mu{spec['mu']:g}'" if spec.get("mu") else ""))
         # Một GPU/experiment, các client chạy lần lượt như smoke đã xác minh trên local.
         federation = (f"num-supernodes={len(DATASETS)} client-resources-num-cpus=2 client-resources-num-gpus=1 "
                       "init-args-num-cpus=2 init-args-num-gpus=1")
