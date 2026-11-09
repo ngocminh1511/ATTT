@@ -4,7 +4,7 @@
   "schema_version": "canonical4_v1",
   "parser_version": "adapters_v1",
   "prep_seed": 42,
-  "train_seeds": [0, 1, 2],
+  "train_seeds": [0],
   "classes": ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"],
   "clients": [
     {"partition_id": 0, "client": 1, "dataset_id": "cicddos2019"},
@@ -74,7 +74,7 @@
       "train_min_per_class": 10000,
       "eval_min_per_class": {"val": 200, "test": 500},
       "eval_max_samples": {"val": 100000, "test": 200000},
-      "rounds": 30, "local_epochs": 5, "seeds": [0, 1, 2]
+      "rounds": 30, "local_epochs": 5, "seeds": [0]
     }
   },
   "split": {

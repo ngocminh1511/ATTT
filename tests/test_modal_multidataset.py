@@ -22,11 +22,11 @@ class ModalJobTests(unittest.TestCase):
     def test_matrix_and_training_budget(self):
         main = jobs.make_specs(self.cfg, "main")
         smoke = jobs.make_specs(self.cfg, "smoke")
-        self.assertEqual(len(main), 8)
+        self.assertEqual(len(main), 4)
         self.assertEqual(len(smoke), 4)
-        self.assertEqual(len({s["name"] for s in main}), 8)
+        self.assertEqual(len({s["name"] for s in main}), 4)
         self.assertEqual({(s["variant"], s["seed"]) for s in main if s["kind"] == "fl"},
-                         {(v, seed) for v in ("das", "all") for seed in (0, 1, 2)})
+                         {(v, seed) for v in ("das", "all") for seed in (0,)})
         self.assertTrue(all(s["rounds"] == 30 and s["epochs"] == 5 for s in main))
         self.assertEqual({s["baseline_epochs"] for s in main if s["kind"] != "fl"}, {150})
         self.assertEqual({s["baseline_epochs"] for s in smoke if s["kind"] != "fl"}, {2})
@@ -123,7 +123,7 @@ class SmokeGateTests(unittest.TestCase):
         result, calls = self.run_controller(False)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(calls, ["smoke", "main"])
-        self.assertEqual(len(result["jobs"]), 12)
+        self.assertEqual(len(result["jobs"]), 8)
 
 
 if __name__ == "__main__":

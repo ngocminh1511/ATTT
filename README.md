@@ -233,7 +233,7 @@ lệch nặng, mô hình gần như không phát hiện được tấn công tr�
 # 3. FL smoke + đánh giá
 .\scripts\fl_run.ps1 "scenario='multidataset' num-server-rounds=2 local-epochs=1 seed=0" -Clients 2 -Actors 1 -DataDir data_paper_multi/smoke -ResultsDir results_multidataset/smoke
 .\.venv\Scripts\python.exe analysis/evaluate_multidataset.py --data-dir data_paper_multi/smoke --results-dir results_multidataset/smoke --checkpoint "results_multidataset/smoke/fl/*_best.pt"
-# Toàn bộ ma trận (FL DAS và đối chứng toàn bộ cột × seed 0/1/2, local-only, centralized, đánh giá):
+# Toàn bộ ma trận (FL DAS và đối chứng toàn bộ cột × seed 0, local-only, centralized, đánh giá):
 .\scripts\run_multidataset.ps1 -Profile main -Gpus 1
 ```
 
@@ -250,7 +250,7 @@ Chạy trên Modal bằng `modal_multidataset.py` (file `modal_app.py` dành cho
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[cloud]"
 # Upload đúng artifact smoke/main và DAS/all đã chuẩn bị, kiểm tra SHA-256 trên cloud.
-# Smoke đạt mới tự chạy main: 6 FL (DAS/all × seed 0/1/2) + 2 baseline, tối đa 2 GPU đồng thời.
+# Smoke đạt mới tự chạy main: 2 FL (DAS/all × seed 0) + 2 baseline, tối đa 2 GPU đồng thời.
 .\.venv\Scripts\modal.exe run --detach modal_multidataset.py
 # Chỉ kiểm tra tích hợp trên Modal:
 .\.venv\Scripts\modal.exe run --detach modal_multidataset.py --smoke-only

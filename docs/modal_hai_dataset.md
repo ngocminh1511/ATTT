@@ -24,8 +24,8 @@ Smoke gồm FL DAS và all (seed 0, 2 vòng × 1 epoch), centralized và local-o
 Chỉ khi tất cả smoke job có đủ best checkpoint, đúng hash và đánh giá đủ hai nguồn mới bắt đầu main.
 Một local-only job tạo hai mô hình riêng, mỗi mô hình được đánh giá trên cả hai test.
 
-Main gồm FL DAS và all × seed 0/1/2, 30 vòng × 5 epoch; centralized và local-only dùng DAS, seed 0,
-150 epoch. Local-only/centralized không có ba seed, phải công bố giới hạn này.
+Main gồm FL DAS và all × seed 0, 30 vòng × 5 epoch; centralized và local-only dùng DAS, seed 0,
+150 epoch. Mọi cấu hình chỉ chạy một seed, nên không có độ lệch chuẩn giữa các lần chạy.
 FL dùng scenario `multidataset`, chọn checkpoint theo validation; chỉ best checkpoint được đánh giá test.
 Baseline gọi `baselines/multidataset_baselines.py`, dùng đúng cùng train/val/test và quy tắc class weight.
 
