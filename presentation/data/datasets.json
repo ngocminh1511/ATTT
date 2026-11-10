@@ -1,0 +1,60 @@
+{
+  "verified_on": "2026-11-10",
+  "cicddos2019": {
+    "title": "CIC-DDoS2019",
+    "publisher": "Canadian Institute for Cybersecurity · University of New Brunswick",
+    "purpose": "Đánh giá phát hiện DDoS: lưu lượng bình thường cùng các cuộc tấn công phản xạ và làm cạn tài nguyên.",
+    "capture": "Testbed mạng; B-Profile mô phỏng hoạt động của 25 người dùng qua HTTP, HTTPS, FTP, SSH và email. Thu PCAP rồi trích xuất flow bằng CICFlowMeter-V3.",
+    "official_url": "https://www.unb.ca/cic/datasets/ddos-2019.html",
+    "official_features": "Hơn 80 đặc trưng lưu lượng trong bản mô tả gốc",
+    "local_version": "Bản Parquet dhoogla/cicddos2019 đang dùng trong bài",
+    "local_rows": 431371,
+    "local_columns": 78,
+    "local_measurements": 77,
+    "local_files": 17,
+    "column_note": "77 đặc trưng + 1 cột Label; khác bản CSV gốc có hơn 80 đặc trưng.",
+    "feature_groups": ["Thời lượng flow", "Số gói / byte hai chiều", "Kích thước gói", "Tốc độ gói / byte", "Khoảng cách gói (IAT)", "Cờ TCP, active / idle"],
+    "days": [
+      {
+        "date": "12/01/2019", "role": "Nguồn train / validation", "rows": 306201, "files": 10,
+        "local_pattern": "*-testing.parquet",
+        "official_attacks": ["NTP", "DNS", "LDAP", "MSSQL", "NetBIOS", "SNMP", "SSDP", "UDP", "UDP-Lag", "WebDDoS", "SYN", "TFTP"],
+        "local_attacks": ["NTP", "DNS", "LDAP", "MSSQL", "NetBIOS", "SNMP", "UDP", "UDP-Lag", "WebDDoS", "SYN", "TFTP"],
+        "note": "Benchmark mô tả 12 kiểu tấn công; bản Parquet hiện có 11 kiểu trong nhóm ngày này, không có SSDP. Có BENIGN."
+      },
+      {
+        "date": "11/03/2019", "role": "Nguồn test", "rows": 125170, "files": 7,
+        "local_pattern": "*-training.parquet",
+        "official_attacks": ["PortMap / PortScan", "NetBIOS", "LDAP", "MSSQL", "UDP", "UDP-Lag", "SYN"],
+        "local_attacks": ["Portmap", "NetBIOS", "LDAP", "MSSQL", "UDP", "UDP-Lag", "SYN"],
+        "note": "Bản đang dùng có nhãn Portmap. Trang UNB có chỗ ghi PortScan trong mô tả và PortMap trong bảng; không đồng nhất hai khái niệm này. Có BENIGN."
+      }
+    ],
+    "date_source_note": "Ngày và chiều train/test theo quy ước đã kiểm tra của dự án cho bản Kaggle; hậu tố tên Parquet bị đảo so với vai trò ngày.",
+    "label_counts": {
+      "12/01/2019": {"Benign":51404,"DrDoS_DNS":3669,"DrDoS_LDAP":1440,"DrDoS_MSSQL":6212,"DrDoS_NetBIOS":598,"DrDoS_NTP":121368,"DrDoS_SNMP":2717,"DrDoS_UDP":10420,"Syn":533,"TFTP":98917,"UDP-lag":8872,"WebDDoS":51},
+      "11/03/2019": {"Benign":46427,"LDAP":1906,"NetBIOS":644,"MSSQL":8523,"Portmap":685,"Syn":48840,"UDP":18090,"UDPLag":55}
+    }
+  },
+  "unsw_nb15": {
+    "title": "UNSW-NB15",
+    "publisher": "UNSW Canberra · Cyber Range Lab",
+    "purpose": "Đánh giá phát hiện xâm nhập mạng với lưu lượng bình thường và chín nhóm tấn công.",
+    "capture": "IXIA PerfectStorm tạo lưu lượng bình thường kết hợp hành vi tấn công; tcpdump thu 100 GB PCAP. Argus, Bro-IDS và 12 thuật toán tạo các trường đặc trưng.",
+    "official_url": "https://research.unsw.edu.au/projects/unsw-nb15-dataset",
+    "official_rows": 2540044,
+    "official_columns": 49,
+    "local_version": "Hai CSV training-set / testing-set được cung cấp từ benchmark",
+    "local_rows": 257673,
+    "local_columns": 45,
+    "local_measurements": 42,
+    "local_files": 2,
+    "column_note": "42 đặc trưng + id + attack_cat + label = 45 cột trong hai CSV đang dùng. Không phải schema 49 trường của bản đầy đủ.",
+    "feature_groups": ["Giao thức / dịch vụ / trạng thái", "Số gói / byte hai chiều", "TTL, tải và mất gói", "IAT và jitter", "TCP timing / window", "Thống kê kết nối / nội dung"],
+    "attacks": ["Fuzzers", "Analysis", "Backdoor", "DoS", "Exploits", "Generic", "Reconnaissance", "Shellcode", "Worms"],
+    "splits": [
+      {"name":"Training-set","rows":175341,"role":"Nguồn train / validation","labels":{"Normal":56000,"Generic":40000,"Exploits":33393,"Fuzzers":18184,"DoS":12264,"Reconnaissance":10491,"Analysis":2000,"Backdoor":1746,"Shellcode":1133,"Worms":130}},
+      {"name":"Testing-set","rows":82332,"role":"Nguồn test","labels":{"Normal":37000,"Generic":18871,"Exploits":11132,"Fuzzers":6062,"DoS":4089,"Reconnaissance":3496,"Analysis":677,"Backdoor":583,"Shellcode":378,"Worms":44}}
+    ]
+  }
+}
