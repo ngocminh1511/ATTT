@@ -62,3 +62,14 @@ node presentation/check.cjs
 `check.cjs` kiểm tra render toàn bộ trang, điều hướng, slide tắt, biểu đồ và snapshot bằng Node; đây không phải kiểm tra bố cục trong trình duyệt. Khi cần phục vụ qua HTTP: `python -m http.server 8765 --directory presentation`, sau đó mở `http://127.0.0.1:8765/`.
 
 Không thay đổi mã chuẩn bị dữ liệu hoặc huấn luyện của dự án. Không có hosting hoặc dịch vụ bên ngoài.
+
+## Trang demo hai node (`demo.html`)
+
+Trang riêng, không nằm trong chuỗi slide: `http://127.0.0.1:5500/presentation/demo.html` (Live Server) hoặc mở trực tiếp file. Hàng đợi gồm 30 flow thật trong tập test (15 CIC, 15 UNSW, khoảng 1/4 là ca mô hình đoán sai); kéo thả hoặc ▲▼ để sắp thứ tự. **Bắn 1 flow / Bắn hết**: flow bay sang node của nguồn dữ liệu (A = CIC, B = UNSW) và rơi vào stack của node, kèm lớp dự đoán, xác suất và đúng/sai. Đổi mô hình FedProx / FedAvg ở góc trên.
+
+Xác suất được tính sẵn từ best checkpoint, trang không chạy mô hình. Dữ liệu: `data/demo.json`; giao diện: `src/demo.html`.
+
+```powershell
+.\.venv\Scripts\python.exe presentation/make_demo.py               # lấy lại 30 flow + xác suất (cần torch, raw data)
+python presentation/make_demo.py --html-only                       # chỉ dựng lại demo.html sau khi sửa src/demo.html
+```
