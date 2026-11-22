@@ -208,7 +208,7 @@ def _fmt(v):
 
 def write_summary(results_dir: Path):
     res = pd.read_csv(results_dir / "evaluation_by_dataset.csv")
-    lines = ["# Kết quả multidataset_v1 (2 client × 3 lớp)", "",
+    lines = ["# Kết quả multidataset_v1 (2 nguồn × 3 lớp; số client theo dataset_manifest.json)", "",
              "Mỗi checkpoint được chọn bằng validation rồi đánh giá MỘT lần trên hai tập test với cùng trọng số, "
              "ngưỡng 0,5. `attack_*` = phát hiện mọi tấn công (1 − P(BENIGN)); `dos_*` = phát hiện nhóm DoS/DDoS "
              "(P(DOS_DDOS)). F1-macro-present chỉ lấy TB trên các lớp có support thật. N/A = không xác định "

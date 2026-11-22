@@ -7,13 +7,16 @@
   "train_seeds": [0],
   "classes": ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"],
   "clients": [
-    {"partition_id": 0, "client": 1, "dataset_id": "cicddos2019"},
-    {"partition_id": 1, "client": 2, "dataset_id": "unsw_nb15"}
+    {"partition_id": 0, "client": 1, "dataset_id": "cicddos2019", "shard": 0},
+    {"partition_id": 1, "client": 2, "dataset_id": "cicddos2019", "shard": 1},
+    {"partition_id": 2, "client": 3, "dataset_id": "unsw_nb15", "shard": 0},
+    {"partition_id": 3, "client": 4, "dataset_id": "unsw_nb15", "shard": 1}
   ],
+  "client_split": {"method": "stratified_round_robin", "by": "original_label", "seed": 42},
   "paths": {
     "raw": "data/raw",
     "cache": "data/cache",
-    "out": "data_paper_multi",
+    "out": "data_paper_multi_4c",
     "results": "results_multidataset"
   },
   "sources": {
@@ -86,6 +89,7 @@
   "class_weight_clip": [0.1, 10.0],
   "fl": {
     "arch": "resvgg_swin", "lr": 0.001, "batch_size": 64, "dropout": 0.3,
-    "threshold": 0.5, "baseline_epochs": 150, "fedprox_mu": 0.1
+    "threshold": 0.5, "baseline_epochs": 150, "fedprox_mu": 0.1,
+    "skip_jobs": ["centralized"]
   }
 }

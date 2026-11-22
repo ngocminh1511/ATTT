@@ -165,7 +165,7 @@ class PipelineTests(unittest.TestCase):
         F = len(feats["features"])
         self.assertTrue(7 <= F <= 6 + 12)
         self.assertEqual(feats["features"][-6:], mp.FIXED)
-        for k in (1, 2):
+        for k in (1, 2, 3, 4):
             for name in (f"client_{k}", f"val_client_{k}"):
                 df = pd.read_parquet(self.out / "multidataset" / f"{name}.parquet")
                 self.assertEqual(list(df.columns[:F]), feats["features"])
@@ -175,7 +175,31 @@ class PipelineTests(unittest.TestCase):
                     self.assertNotIn(col, feats["features"])
         ds = read_json(self.out / "dataset_manifest.json")
         self.assertEqual({c["partition_id"]: c["dataset_id"] for c in ds["clients"]},
-                         {0: "cicddos2019", 1: "unsw_nb15"})
+                         {0: "cicddos2019", 1: "cicddos2019", 2: "unsw_nb15", 3: "unsw_nb15"})
+
+    def test_client_shards_even_and_disjoint(self):
+        """2 client cùng nguồn: tách rời, hợp lại = subset của nguồn, mỗi nhãn gốc lệch ≤ 1, tổng lệch ≤ 1."""
+        quality = read_json(self.out / "quality_report.json")
+        for ds, (a, b) in (("cicddos2019", (1, 2)), ("unsw_nb15", (3, 4))):
+            for prefix, sp in (("client", "train"), ("val_client", "val")):
+                fa, fb = (pd.read_parquet(self.out / "multidataset" / f"{prefix}_{k}.parquet") for k in (a, b))
+                self.assertFalse(set(fa["row_id"]) & set(fb["row_id"]), (ds, sp))
+                self.assertEqual(len(fa) + len(fb), sum(quality["used_counts"][ds][sp].values()), (ds, sp))
+                self.assertLessEqual(abs(len(fa) - len(fb)), 1, (ds, sp))
+                ca, cb = fa["original_label"].value_counts(), fb["original_label"].value_counts()
+                for lab in set(ca.index) | set(cb.index):
+                    self.assertLessEqual(abs(ca.get(lab, 0) - cb.get(lab, 0)), 1, (ds, sp, lab))
+        counts = quality["client_split"]["counts_by_original_label"]
+        self.assertEqual(set(counts), {"client_1", "client_2", "client_3", "client_4"})
+
+    def test_split_shards_deterministic(self):
+        df = pd.DataFrame({"row_id": [f"r{i}" for i in range(11)], "original_label": list("aaaaabbbbbc")})
+        s = mp.split_shards(df, 2, 42)
+        shuffled = df.sample(frac=1, random_state=1).reset_index(drop=True)
+        again = dict(zip(shuffled["row_id"], mp.split_shards(shuffled, 2, 42)))
+        self.assertEqual(dict(zip(df["row_id"], s)), again)  # không phụ thuộc thứ tự dòng đầu vào
+        self.assertEqual(sorted(np.bincount(s).tolist()), [5, 6])
+        np.testing.assert_array_equal(mp.split_shards(df, 1, 42), np.zeros(11, dtype=int))
 
     def test_cic_absent_class_ok(self):
         w = read_json(self.out / "multidataset" / "class_weights.json")
@@ -262,9 +286,9 @@ class PipelineTests(unittest.TestCase):
         paths.configure(str(self.out), str(self.tmp / "results"))
         self.assertTrue(task.is_multi())
         self.assertFalse(task.uses_scaler())
-        tr, va = task.load_local(1, "multidataset", 32)
-        self.assertEqual(len(tr.dataset), len(pd.read_parquet(self.out / "multidataset" / "client_2.parquet")))
-        self.assertEqual(len(va.dataset), len(pd.read_parquet(self.out / "multidataset" / "val_client_2.parquet")))
+        tr, va = task.load_local(3, "multidataset", 32)
+        self.assertEqual(len(tr.dataset), len(pd.read_parquet(self.out / "multidataset" / "client_4.parquet")))
+        self.assertEqual(len(va.dataset), len(pd.read_parquet(self.out / "multidataset" / "val_client_4.parquet")))
         self.assertEqual(task.mtb_weights(0, "multidataset")[2], 0.0)
         model = task.make_model("mlp", 0.1)
         md = task.meta()
@@ -323,7 +347,8 @@ class MetricTests(unittest.TestCase):
 class ServerTests(unittest.TestCase):
     def _strategy(self):
         from fl_ddos.multidataset_server import MultiSourceFedAvg
-        s = MultiSourceFedAvg(min_train_nodes=2, min_evaluate_nodes=2, min_available_nodes=2)
+        s = MultiSourceFedAvg({0: "cicddos2019", 1: "unsw_nb15"},
+                              min_train_nodes=2, min_evaluate_nodes=2, min_available_nodes=2)
         s._check_and_log_replies = lambda replies, is_train, validate=True: (list(replies), [])
         return s
 
@@ -348,6 +373,16 @@ class ServerTests(unittest.TestCase):
         m = s.aggregate_evaluate(1, [self._reply(0, 1, .3), self._reply(1, 1, .9)])
         self.assertAlmostEqual(m["val_score"], 0.6)
         self.assertAlmostEqual(s.val_by_round[1]["val_score"], 0.6)
+
+    def test_four_clients_score_by_source(self):
+        from fl_ddos.multidataset_server import MultiSourceFedAvg
+        s = MultiSourceFedAvg({0: "cicddos2019", 1: "cicddos2019", 2: "unsw_nb15", 3: "unsw_nb15"})
+        s._check_and_log_replies = lambda replies, is_train, validate=True: (list(replies), [])
+        m = s.aggregate_evaluate(1, [self._reply(0, 1, .2), self._reply(1, 1, .4),
+                                     self._reply(2, 1, .8), self._reply(3, 1, 1.0)])
+        self.assertAlmostEqual(m["val_score"], 0.6)  # TB(0.3, 0.9)
+        self.assertAlmostEqual(s.val_by_round[1]["val_f1mp_cicddos2019"], 0.3)
+        self.assertAlmostEqual(s.val_by_round[1]["val_f1mp_pid3"], 1.0)
 
 
 if __name__ == "__main__":

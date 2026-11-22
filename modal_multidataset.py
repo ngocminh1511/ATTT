@@ -1,9 +1,10 @@
-r"""Modal: upload artifact đã chốt -> smoke gate -> 2 FL (DAS/all, seed 0) + 2 baseline main.
+r"""Modal: upload artifact đã chốt (4 client, data_paper_multi_4c) -> smoke gate -> FL DAS/all/FedProx
+(seed 0) + local-only 4 client. Centralized bỏ qua theo configs fl.skip_jobs (dùng lại run 2 client).
 
   .venv\Scripts\modal.exe run --detach modal_multidataset.py
   .venv\Scripts\modal.exe run --detach modal_multidataset.py --smoke-only
 
-App/Volume riêng: fl-ddos-multidataset. Không chuẩn bị raw hoặc đổi split trên cloud.
+App/Volume riêng: fl-ddos-multidataset-4c. Không chuẩn bị raw hoặc đổi split trên cloud.
 Kết quả: /runs/{run_id}/results/{smoke|main}/{das|all}, tiến độ /runs/{run_id}/status.json.
 """
 from __future__ import annotations
@@ -28,7 +29,7 @@ from fl_ddos.modal_multidataset_jobs import (build_bundle, commands, data_name, 
 ROOT = Path(__file__).resolve().parent
 REMOTE = "/root/project"
 VOL = "/vol"
-VOLUME_NAME = "fl-ddos-multidataset"
+VOLUME_NAME = "fl-ddos-multidataset-4c"
 MAX_GPU_CONTAINERS = 4
 GPU = "A10G"
 image = (
@@ -43,7 +44,7 @@ image = (
                    ignore=[".venv", ".git", "data", "data_*", "results", "results_*", "docs", "notebooks",
                            "logs", "**/__pycache__", "*.pt", "*.pdf", "*.docx"])
 )
-app = modal.App("fl-ddos-multidataset", image=image)
+app = modal.App("fl-ddos-multidataset-4c", image=image)
 vol = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
 

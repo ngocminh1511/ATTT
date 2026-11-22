@@ -22,13 +22,17 @@ class ModalJobTests(unittest.TestCase):
     def test_matrix_and_training_budget(self):
         main = jobs.make_specs(self.cfg, "main")
         smoke = jobs.make_specs(self.cfg, "smoke")
-        self.assertEqual(len(main), 5)
-        self.assertEqual(len(smoke), 5)
-        self.assertEqual(len({s["name"] for s in main}), 5)
+        self.assertEqual(len(main), 4)
+        self.assertEqual(len(smoke), 4)
+        self.assertEqual(len({s["name"] for s in main}), 4)
+        self.assertNotIn("centralized", {s["kind"] for s in main})  # fl.skip_jobs
+        self.assertIn("local", {s["kind"] for s in main})
         self.assertEqual({(s["variant"], s["seed"], s.get("mu", 0)) for s in main if s["kind"] == "fl"},
                          {("das", 0, 0), ("all", 0, 0), ("das", 0, self.cfg["fl"]["fedprox_mu"])})
         only = jobs.make_specs(self.cfg, "main", {"fl_das_fedprox_seed0"})
         self.assertEqual([s["name"] for s in only], ["fl_das_fedprox_seed0"])
+        central = jobs.make_specs(self.cfg, "main", {"centralized_das_seed0"})  # --only vượt qua skip_jobs
+        self.assertEqual([s["kind"] for s in central], ["centralized"])
         with self.assertRaises(ValueError):
             jobs.make_specs(self.cfg, "main", {"khong_co"})
         self.assertTrue(all(s["rounds"] == 30 and s["epochs"] == 5 for s in main))
@@ -40,8 +44,10 @@ class ModalJobTests(unittest.TestCase):
             cmds = jobs.commands(spec, "/vol/data", "/tmp/output", "python")
             if spec["kind"] == "fl":
                 self.assertIn("scenario='multidataset'", cmds[0][-1])
-                self.assertIn("num-clients=2", cmds[0][-1])
-                self.assertIn("num-supernodes=2", cmds[0][-3])
+                self.assertIn("num-clients=4", cmds[0][-1])
+                fed = cmds[0][-3].split()
+                self.assertIn("num-supernodes=4", fed)
+                self.assertTrue(all(kv.count("=") == 1 for kv in fed), fed)  # mỗi cặp key=value tách bằng dấu cách
                 if spec.get("mu"):
                     self.assertIn(f"proximal-mu={spec['mu']}", cmds[0][-1])
                     self.assertIn("tag-suffix='_fedprox_mu", cmds[0][-1])
@@ -69,7 +75,7 @@ class ModalJobTests(unittest.TestCase):
                     hashes = {"schema": variant, "preprocessor": profile + variant, "split": profile}
                     clients = [{"partition_id": i, "dataset_id": ds, "train_file": f"multidataset/train{i}.parquet",
                                 "val_file": f"multidataset/val{i}.parquet", "test_file": f"test/{ds}.parquet"}
-                               for i, ds in jobs.DATASETS.items()]
+                               for i, ds in jobs.CLIENTS.items()]
                     metadata = {"pipeline": "multidataset_v1", "sampling_policy": jobs.POLICY,
                                 "profile": profile, "feature_set": variant, "hashes": hashes}
                     manifest = {"hashes": hashes, "clients": clients}
@@ -132,7 +138,7 @@ class SmokeGateTests(unittest.TestCase):
         result, calls = self.run_controller(False)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(calls, ["smoke", "main"])
-        self.assertEqual(len(result["jobs"]), 10)
+        self.assertEqual(len(result["jobs"]), 8)
 
 
 if __name__ == "__main__":

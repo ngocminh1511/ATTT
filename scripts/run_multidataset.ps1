@@ -1,4 +1,4 @@
-# Ma trận thí nghiệm multidataset_v1: 2 client (CIC-DDoS2019, UNSW-NB15) × 3 lớp.
+# Ma trận thí nghiệm multidataset_v1: 2 nguồn (CIC-DDoS2019, UNSW-NB15) × 3 lớp, số client theo configs (hiện 4).
 #   .\scripts\run_multidataset.ps1 -Profile smoke                # 2 vòng × 1 epoch, seed 0, kiểm tra tích hợp
 #   .\scripts\run_multidataset.ps1 -Profile main                 # 30 × 5, seed 0, DAS và đối chứng toàn bộ cột
 #   .\scripts\run_multidataset.ps1 -Profile main -Steps prep     # chỉ chuẩn bị dữ liệu
@@ -25,9 +25,9 @@ function Invoke-Step([string]$what, [scriptblock]$block) {
 
 Push-Location $root
 try {
-    $variants = @(@{ Name = "das"; Data = "data_paper_multi/$Profile"; Res = "results_multidataset/$Profile" })
+    $variants = @(@{ Name = "das"; Data = "$($cfg.paths.out)/$Profile"; Res = "results_multidataset/$Profile" })
     if ($Steps -contains "fl_all") {
-        $variants += @{ Name = "all"; Data = "data_paper_multi/${Profile}_all"; Res = "results_multidataset/${Profile}_all" }
+        $variants += @{ Name = "all"; Data = "$($cfg.paths.out)/${Profile}_all"; Res = "results_multidataset/${Profile}_all" }
     }
     if ($Steps -contains "prep") {
         foreach ($v in $variants) {

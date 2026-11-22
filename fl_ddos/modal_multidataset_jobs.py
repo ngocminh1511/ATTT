@@ -5,7 +5,9 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 
-DATASETS = {0: "cicddos2019", 1: "unsw_nb15"}
+# PID -> nguồn: 2 client mỗi nguồn (configs/multidataset.json: clients[].shard).
+CLIENTS = {0: "cicddos2019", 1: "cicddos2019", 2: "unsw_nb15", 3: "unsw_nb15"}
+SOURCES = ("cicddos2019", "unsw_nb15")
 VARIANTS = ("das", "all")
 POLICY = "class_quota_v3"
 
@@ -48,8 +50,8 @@ def build_bundle(data_root: Path) -> dict:
                 raise ValueError(f"{folder}: cần pipeline multidataset_v1 với policy {POLICY}")
             if md.get("profile") != profile or md.get("feature_set") != variant:
                 raise ValueError(f"{folder}: profile/feature_set không khớp")
-            if {c["partition_id"]: c["dataset_id"] for c in manifest["clients"]} != DATASETS:
-                raise ValueError(f"{folder}: PID không khớp hai nguồn")
+            if {c["partition_id"]: c["dataset_id"] for c in manifest["clients"]} != CLIENTS:
+                raise ValueError(f"{folder}: PID -> nguồn không khớp {CLIENTS}")
             if md["hashes"] != manifest["hashes"]:
                 raise ValueError(f"{folder}: hashes trong manifest khác features.json")
             if quality.get("status") == "failed":
@@ -100,9 +102,11 @@ def make_specs(cfg: dict, profile: str, only=None) -> list[dict]:
         specs += [{**common, "variant": "das", "kind": "fl", "seed": seed, "mu": mu,
                    "name": f"fl_das_fedprox_seed{seed}"} for seed in p["seeds"]]
     baseline_epochs = p["rounds"] * p["local_epochs"] if profile == "smoke" else cfg["fl"]["baseline_epochs"]
+    # vd centralized: dữ liệu như run cũ -> dùng lại kết quả; --only chỉ định rõ job thì không bỏ qua
+    skip = set() if only else set(cfg["fl"].get("skip_jobs", []))
     specs += [{**common, "variant": "das", "kind": kind, "seed": p["seeds"][0],
                "baseline_epochs": baseline_epochs, "name": f"{kind}_das_seed{p['seeds'][0]}"}
-              for kind in ("centralized", "local")]
+              for kind in ("centralized", "local") if kind not in skip]
     if only:
         unknown = set(only) - {s["name"] for s in specs}
         if unknown:
@@ -113,13 +117,13 @@ def make_specs(cfg: dict, profile: str, only=None) -> list[dict]:
 
 def commands(spec: dict, data: str, output: str, python: str) -> list[list[str]]:
     if spec["kind"] == "fl":
-        config = (f"scenario='multidataset' data-dir='{data}' results-dir='{output}' num-clients={len(DATASETS)} "
+        config = (f"scenario='multidataset' data-dir='{data}' results-dir='{output}' num-clients={len(CLIENTS)} "
                   f"arch='{spec['arch']}' seed={spec['seed']} num-server-rounds={spec['rounds']} "
                   f"local-epochs={spec['epochs']} lr={spec['lr']} batch-size={spec['batch_size']} "
                   f"dropout={spec['dropout']} strategy='fedavg' proximal-mu={float(spec.get('mu', 0.0))}"
                   + (f" tag-suffix='_fedprox_mu{spec['mu']:g}'" if spec.get("mu") else ""))
         # Một GPU/experiment, các client chạy lần lượt như smoke đã xác minh trên local.
-        federation = (f"num-supernodes={len(DATASETS)} client-resources-num-cpus=2 client-resources-num-gpus=1 "
+        federation = (f"num-supernodes={len(CLIENTS)} client-resources-num-cpus=2 client-resources-num-gpus=1 "
                       "init-args-num-cpus=2 init-args-num-gpus=1")
         return [["flwr", "run", ".", "--stream", "--federation-config", federation, "--run-config", config],
                 [python, "analysis/evaluate_multidataset.py", "--data-dir", data, "--results-dir", output,
@@ -136,7 +140,7 @@ def validate_results(output: Path, spec: dict, hashes: dict):
     import pandas as pd
     import torch
 
-    expected = len(DATASETS) if spec["kind"] == "local" else 1
+    expected = len(CLIENTS) if spec["kind"] == "local" else 1
     checkpoints = list(output.rglob("*_best.pt"))
     if len(checkpoints) != expected:
         raise RuntimeError(f"Cần {expected} best checkpoint, tìm thấy {len(checkpoints)}")
@@ -148,8 +152,8 @@ def validate_results(output: Path, spec: dict, hashes: dict):
     if table["checkpoint_sha256"].nunique() != expected:
         raise RuntimeError("Số checkpoint đánh giá không khớp")
     for _, rows in table.groupby("checkpoint_sha256"):
-        actual = rows[rows.dataset_id.isin(DATASETS.values())]
-        if len(actual) != len(DATASETS) or set(actual.dataset_id) != set(DATASETS.values()):
+        actual = rows[rows.dataset_id.isin(SOURCES)]
+        if len(actual) != len(SOURCES) or set(actual.dataset_id) != set(SOURCES):
             raise RuntimeError("Checkpoint chưa được đánh giá đủ các tập test")
     if spec["kind"] == "fl":
         rounds = pd.read_csv(next((output / "fl").glob("*_rounds.csv")))
@@ -157,7 +161,7 @@ def validate_results(output: Path, spec: dict, hashes: dict):
         if set(rounds["round"]) != set(range(1, spec["rounds"] + 1)):
             raise RuntimeError("FL chưa hoàn tất đủ số vòng")
         for (_, _), rows in clients.groupby(["round", "phase"]):
-            if len(rows) != len(DATASETS) or set(rows["partition-id"]) != set(DATASETS):
+            if len(rows) != len(CLIENTS) or set(rows["partition-id"]) != set(CLIENTS):
                 raise RuntimeError("FL thiếu/trùng phản hồi client")
 
 

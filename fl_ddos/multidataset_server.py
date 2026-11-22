@@ -1,7 +1,9 @@
-"""Server FL cho pipeline multidataset_v1: 2 client = 2 nguồn (CIC, UNSW), FedAvg theo số mẫu train thật.
+"""Server FL cho pipeline multidataset_v1: K client lấy từ dataset_manifest.json (hiện 4 client, 2 client
+mỗi nguồn CIC/UNSW), FedAvg theo số mẫu train thật.
 
-Mỗi vòng: train cục bộ -> kiểm tra đủ đúng PID 0/1, cùng round -> FedAvg -> gửi model đã gộp về hai
-client đánh giá trên validation riêng -> điểm chọn model = TB đều F1-macro-present của hai validation.
+Mỗi vòng: train cục bộ -> kiểm tra đủ đúng PID 0..K−1, cùng round -> FedAvg -> gửi model đã gộp về các
+client đánh giá trên validation riêng -> điểm chọn model = TB theo nguồn của (TB F1-macro-present các
+client thuộc nguồn đó), nên mỗi nguồn có trọng số bằng nhau dù số client mỗi nguồn khác nhau.
 evaluate_fn chỉ đọc điểm validation đã gộp của đúng vòng đó (Flower gọi aggregate_evaluate trước
 evaluate_fn); không có lượt đọc test nào ở đây. Vòng 0 chỉ ghi trạng thái khởi tạo.
 
@@ -27,7 +29,7 @@ from fl_ddos import paths
 from fl_ddos.multidataset_prep import dump_json, read_json
 from fl_ddos.task import classes, features, make_model, meta, set_seed
 
-EXPECTED_PIDS = (0, 1)
+SOURCES = ("cicddos2019", "unsw_nb15")
 
 
 class FLRunError(RuntimeError):
@@ -41,9 +43,10 @@ def _rows(replies) -> list[dict]:
 class MultiSourceFedAvg(FedAvg):
     """FedAvg + kiểm tra đủ phản hồi và lưu điểm validation theo vòng."""
 
-    def __init__(self, expected_pids=EXPECTED_PIDS, **kw):
+    def __init__(self, pid_to_source: dict, **kw):
         super().__init__(**kw)
-        self.expected = sorted(expected_pids)
+        self.pid_to_source = {int(p): s for p, s in pid_to_source.items()}
+        self.expected = sorted(self.pid_to_source)
         self.val_by_round: dict[int, dict] = {}
         self.client_log: list[dict] = []
 
@@ -73,8 +76,13 @@ class MultiSourceFedAvg(FedAvg):
         per = {int(m["partition-id"]): float(m["eval_f1_macro_present"]) for m in ms}
         if not all(math.isfinite(v) for v in per.values()):
             raise FLRunError(f"Vòng {server_round}: F1-macro-present validation không hữu hạn {per}")
-        score = float(np.mean([per[p] for p in self.expected]))
-        self.val_by_round[server_round] = {"val_score": score, **{f"val_f1mp_pid{p}": per[p] for p in self.expected}}
+        by_source = {}
+        for p in self.expected:
+            by_source.setdefault(self.pid_to_source[p], []).append(per[p])
+        src = {s: float(np.mean(v)) for s, v in by_source.items()}
+        score = float(np.mean(list(src.values())))
+        self.val_by_round[server_round] = {"val_score": score, **{f"val_f1mp_pid{p}": per[p] for p in self.expected},
+                                           **{f"val_f1mp_{s}": v for s, v in src.items()}}
         for m in ms:
             self.client_log.append({"round": server_round, "phase": "val", **m})
         out = dict(self.val_by_round[server_round])
@@ -106,8 +114,8 @@ def pid_map() -> dict:
         raise FLRunError(f"Thiếu {f}")
     clients = read_json(f)["clients"]
     m = {int(c["partition_id"]): c["dataset_id"] for c in clients}
-    if sorted(m) != list(EXPECTED_PIDS) or len(set(m.values())) != len(m):
-        raise FLRunError(f"dataset_manifest.json phải khóa PID {list(EXPECTED_PIDS)} với các nguồn khác nhau: {m}")
+    if len(m) != len(clients) or sorted(m) != list(range(len(m))) or set(m.values()) != set(SOURCES):
+        raise FLRunError(f"dataset_manifest.json phải có PID 0..K−1 (không trùng) phủ đủ nguồn {SOURCES}: {m}")
     return m
 
 
@@ -123,12 +131,12 @@ def run_multidataset(grid: Grid, context: Context) -> None:
     rc = {k: v for k, v in context.run_config.items()}
     seed, arch, dropout = int(rc["seed"]), str(rc.get("arch", "resvgg_swin")), float(rc.get("dropout", 0.3))
     n_clients, n_rounds = int(rc["num-clients"]), int(rc["num-server-rounds"])
-    if n_clients != len(EXPECTED_PIDS):
-        raise FLRunError(f"multidataset_v1 cần đúng {len(EXPECTED_PIDS)} client, run config có num-clients={n_clients}")
     # FedProx = FedAvg ở server + số hạng proximal mu/2·‖w − w_global‖² ở client (fl_ddos/task.py: train).
     if str(rc.get("strategy", "fedavg")) != "fedavg" or rc.get("poison-clients"):
         raise FLRunError("multidataset_v1 chỉ hỗ trợ FedAvg/FedProx, không poison/trimmed")
     pmap = pid_map()
+    if n_clients != len(pmap):
+        raise FLRunError(f"Manifest có {len(pmap)} client, run config có num-clients={n_clients}")
     tag = f"multidataset_{arch}_seed{seed}" + str(rc.get("tag-suffix", ""))
     out = paths.RESULTS / "fl"
     out.mkdir(parents=True, exist_ok=True)
@@ -138,7 +146,7 @@ def run_multidataset(grid: Grid, context: Context) -> None:
     model = make_model(arch, dropout)
     n_params = sum(p.numel() for p in model.parameters())
     strategy = MultiSourceFedAvg(
-        fraction_train=1.0, fraction_evaluate=1.0, min_train_nodes=n_clients, min_evaluate_nodes=n_clients,
+        pmap, fraction_train=1.0, fraction_evaluate=1.0, min_train_nodes=n_clients, min_evaluate_nodes=n_clients,
         min_available_nodes=n_clients, train_metrics_aggr_fn=_train_aggr)
     best = {"round": None, "score": -math.inf, "state": None}
 

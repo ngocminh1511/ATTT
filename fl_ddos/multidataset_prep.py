@@ -1,8 +1,10 @@
-"""Pipeline dữ liệu multidataset_v1: 2 client (CIC-DDoS2019, UNSW-NB15) × 3 lớp.
+"""Pipeline dữ liệu multidataset_v1: 2 nguồn (CIC-DDoS2019, UNSW-NB15) × 3 lớp, mỗi nguồn chia cho
+một hoặc nhiều client (configs: clients[].shard; hiện 4 client = 2 client/nguồn).
 
 Thứ tự: adapter -> kiểm tra nhãn/chất lượng -> chia train/validation/test theo nhóm -> lấy subset theo
-quota lớp (hash seed 42) -> 17 cột liên tục + 6 cột cố định -> log1p -> AFN theo protocol (thống kê
-train hai client, hỗ trợ missing) -> DAS (CRA + IDF, pooled) -> class weight -> artifacts.
+quota lớp (hash seed 42) -> chia train/val của mỗi nguồn thành shard client (phân tầng theo nhãn gốc,
+round-robin) -> 17 cột liên tục + 6 cột cố định -> log1p -> AFN theo protocol (thống kê train các
+client, hỗ trợ missing) -> DAS (CRA + IDF, pooled) -> class weight theo client -> artifacts.
 
 Không sinh mẫu (CTA/DPCA), không TEC/MTB/NDS/JAA/DRA/LIS trong v1 (kế hoạch mục 2).
 Mọi tham số fit chỉ dùng train; validation/test chỉ transform.
@@ -415,6 +417,51 @@ def choose_subsets(splits: dict, caps: dict) -> dict:
     return splits
 
 
+def split_shards(frame: pd.DataFrame, n_shards: int, seed: int, by: str = "original_label") -> np.ndarray:
+    """Gán mỗi dòng vào shard 0..n−1: trong từng nhãn gốc (xét theo tên), sắp theo row_id rồi xáo bằng seed,
+    giao round-robin với bộ đếm chạy liên tục qua các nhãn. Mỗi nhãn lệch tối đa 1 mẫu giữa các shard,
+    tổng các shard lệch tối đa 1; kết quả chỉ phụ thuộc dữ liệu và seed."""
+    shard = np.full(len(frame), -1, dtype=np.int64)
+    if n_shards == 1:
+        return np.zeros(len(frame), dtype=np.int64)
+    rng = np.random.default_rng(seed)
+    labels = frame[by].astype(str).values
+    rid = frame["row_id"].astype(str).values
+    counter = 0
+    for lab in sorted(set(labels)):
+        idx = np.where(labels == lab)[0]
+        idx = idx[np.argsort(rid[idx], kind="stable")]
+        idx = idx[rng.permutation(len(idx))]
+        shard[idx] = (np.arange(len(idx)) + counter) % n_shards
+        counter += len(idx)
+    return shard
+
+
+def client_frames(sub: dict, cfg: dict) -> dict:
+    """{client k: {"train", "val"}} từ subset theo nguồn; client cùng nguồn nhận các shard rời nhau."""
+    seed = int(cfg.get("client_split", {}).get("seed", cfg["prep_seed"]))
+    by = cfg.get("client_split", {}).get("by", "original_label")
+    out = {}
+    for ds in sub:
+        cs = sorted((c for c in cfg["clients"] if c["dataset_id"] == ds), key=lambda c: c.get("shard", 0))
+        if sorted(c.get("shard", 0) for c in cs) != list(range(len(cs))):
+            raise PrepError(f"{ds}: shard của client phải là 0..{len(cs) - 1}")
+        assign = {sp: split_shards(sub[ds][sp], len(cs), seed, by) for sp in ("train", "val")}
+        for c in cs:
+            out[c["client"]] = {sp: sub[ds][sp][assign[sp] == c.get("shard", 0)].reset_index(drop=True)
+                                for sp in ("train", "val")}
+    return out
+
+
+def client_original_counts(frames: dict, cfg: dict) -> dict:
+    """{client_k: {dataset_id, train: {nhãn gốc: n}, val: {...}}} để đối chiếu bảng chia client."""
+    ds_of = {c["client"]: c["dataset_id"] for c in cfg["clients"]}
+    return {f"client_{k}": {"dataset_id": ds_of[k], **{sp: {str(lab): int(n) for lab, n in
+                                                            f[sp]["original_label"].value_counts().items()}
+                                                       for sp in ("train", "val")}}
+            for k, f in sorted(frames.items())}
+
+
 def independence_checks(splits: dict) -> dict:
     out = {}
     for ds, s in splits.items():
@@ -437,8 +484,7 @@ def independence_checks(splits: dict) -> dict:
 
 def load_sources(cfg: dict, root: Path, only=None) -> dict:
     sources = {}
-    for c in cfg["clients"]:
-        ds = c["dataset_id"]
+    for ds in dict.fromkeys(c["dataset_id"] for c in cfg["clients"]):
         if only and ds not in only:
             continue
         log(f"Đọc nguồn {ds}")
@@ -480,21 +526,27 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
     if gtrain != set(range(len(ad.CLASSES))):
         raise PrepError(f"Train gộp của các client thiếu lớp: có {sorted(gtrain)}")
 
+    log(f"Chia train/validation của mỗi nguồn cho {len(cfg['clients'])} client")
+    frames = client_frames(sub, cfg)
+
     log("Fit log1p + AFN theo protocol và DAS trên train các client")
-    fitted, table = fit_preprocessor({ds: sub[ds]["train"] for ds in sub}, cfg, feature_set)
+    fitted, table = fit_preprocessor({f"client_{k}": f["train"] for k, f in sorted(frames.items())}, cfg,
+                                     feature_set)
     log(f"Đặc trưng cuối ({len(fitted['features'])}): {fitted['features']}")
 
     (out / "multidataset").mkdir(parents=True, exist_ok=True)
     (out / "test").mkdir(parents=True, exist_ok=True)
     weights, manifest_clients = {}, []
+    for ds in sub:
+        model_frame(sub[ds]["test"], fitted).to_parquet(out / "test" / f"{ds}.parquet", index=False)
+    n_test = {ds: len(sub[ds]["test"]) for ds in sub}
     for c in cfg["clients"]:
         ds, k = c["dataset_id"], c["client"]
-        tr, va, te = (model_frame(sub[ds][sp], fitted) for sp in SPLITS)
+        tr, va = (model_frame(frames[k][sp], fitted) for sp in ("train", "val"))
         tr.to_parquet(out / "multidataset" / f"client_{k}.parquet", index=False)
         va.to_parquet(out / "multidataset" / f"val_client_{k}.parquet", index=False)
-        te.to_parquet(out / "test" / f"{ds}.parquet", index=False)
         weights[f"client_{k}"] = class_weights(tr["y"].values, len(ad.CLASSES), tuple(cfg["class_weight_clip"]))
-        manifest_clients.append({**c, "n_train": len(tr), "n_val": len(va), "n_test": len(te),
+        manifest_clients.append({**c, "n_train": len(tr), "n_val": len(va), "n_test": n_test[ds],
                                  "train_file": f"multidataset/client_{k}.parquet",
                                  "val_file": f"multidataset/val_client_{k}.parquet", "test_file": f"test/{ds}.parquet"})
     dump_json({**weights, "rule": "inverse frequency, mean(present)=1, clip " + str(cfg["class_weight_clip"]) +
@@ -527,6 +579,7 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
         "used_counts": {ds: {sp: {ad.CLASSES[int(c)]: int(n) for c, n in sub[ds][sp]["y"].value_counts()
                                   .sort_index().items()} for sp in SPLITS} for ds in sub},
         "quota": {ds: s["quota"] for ds, s in splits.items()},
+        "client_split": {**cfg.get("client_split", {}), "counts_by_original_label": client_original_counts(frames, cfg)},
         "sampling_policy": POLICY_VERSION,
         "integration_only": bool(caps.get("integration_only", False)),
         "sampling": {ds: s["sampling"] for ds, s in splits.items()},
@@ -556,7 +609,18 @@ def prepare_multidataset(config: dict, profile: str, root: Path | str = ".", out
             report.append(f"| {ds} | {sp} | " + " | ".join(f"{counts.get(c, 0):,}" for c in ad.CLASSES) +
                           f" | {sum(counts.values()):,} |")
     report.extend(["", "Train đặt sàn rồi phân ngân sách còn lại theo counts gốc. "
-                   "Val/test giữ tỷ lệ lớp gốc, không sinh mẫu hoặc lấp quota bằng lớp khác.", ""])
+                   "Val/test giữ tỷ lệ lớp gốc, không sinh mẫu hoặc lấp quota bằng lớp khác.", "",
+                   f"## Chia client ({len(cfg['clients'])} client)", "",
+                   "Train/val của mỗi nguồn chia đều cho các client cùng nguồn, phân tầng theo nhãn gốc "
+                   "(round-robin, seed cố định). Test giữ theo nguồn.", "",
+                   "| Client | Nguồn | Tập | BENIGN | DOS_DDOS | OTHER_ATTACK | Tổng |", "|---|---|---|---:|---:|---:|---:|"])
+    for c in cfg["clients"]:
+        for sp in ("train", "val"):
+            counts = frames[c["client"]][sp]["y"].value_counts()
+            report.append(f"| {c['client']} | {c['dataset_id']} | {sp} | " +
+                          " | ".join(f"{int(counts.get(i, 0)):,}" for i in range(len(ad.CLASSES))) +
+                          f" | {int(counts.sum()):,} |")
+    report.append("")
     report.extend(f"- {w}" for w in warnings)
     (out / "sampling_report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     raw_manifest = {}

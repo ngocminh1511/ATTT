@@ -4,7 +4,7 @@
   python prepare/multidataset_pipeline.py --profile main
   python prepare/multidataset_pipeline.py --profile main --feature-set all     # đối chứng không DAS -> main_all/
 
-Output: data_paper_multi/{profile}[_all]/ (features.json, prep_params.json, dataset_manifest.json,
+Output: {paths.out trong config, hiện data_paper_multi_4c}/{profile}[_all]/ (features.json, prep_params.json, dataset_manifest.json,
 split_manifest.parquet, quality_report.json, feature_selection.csv, multidataset/, test/).
 """
 import argparse
@@ -23,7 +23,7 @@ def main():
     ap.add_argument("--config", default="configs/multidataset.json")
     ap.add_argument("--profile", choices=["smoke", "main"], default="smoke")
     ap.add_argument("--feature-set", choices=["das", "all"], default="das")
-    ap.add_argument("--out", default="", help="mặc định data_paper_multi/{profile}[_all]")
+    ap.add_argument("--out", default="", help="mặc định {paths.out}/{profile}[_all]")
     a = ap.parse_args()
     cfg_path = Path(a.config) if Path(a.config).is_absolute() else ROOT / a.config
     try:

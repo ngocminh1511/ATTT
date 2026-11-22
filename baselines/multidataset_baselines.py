@@ -1,7 +1,8 @@
 """Baseline đối chứng cho multidataset_v1 (kế hoạch mục 9), cùng split/subset với FL.
 
-  local        mỗi nguồn một mô hình, chỉ học train của nguồn đó; chọn epoch theo validation của nguồn đó
-  centralized  gộp train hai nguồn (nghiên cứu tập trung); chọn epoch theo TB đều F1-macro-present 2 validation
+  local        mỗi client một mô hình, chỉ học train của client đó; chọn epoch theo validation của client đó
+  centralized  gộp train mọi client (nghiên cứu tập trung); validation gộp theo nguồn, chọn epoch theo TB đều
+               F1-macro-present của các nguồn (không phụ thuộc số client mỗi nguồn)
 
 Cả hai: class weight tính bằng cùng hàm với FL trên đúng tập train được dùng, Adam lr 0.001, batch 64,
 mốc 150 epoch (= 30 vòng × 5 epoch của FL). Best checkpoint được đánh giá một lần trên hai tập test bằng
@@ -87,18 +88,25 @@ def main():
         sys.exit(f"{data}: không phải dữ liệu {MULTI}")
     dev = device()
     clients = read_json(data / "dataset_manifest.json")["clients"]
-    tr = {c["dataset_id"]: pd.read_parquet(data / c["train_file"]) for c in clients}
-    va = {c["dataset_id"]: pd.read_parquet(data / c["val_file"]) for c in clients}
+    tr = {c["client"]: pd.read_parquet(data / c["train_file"]) for c in clients}
+    va = {c["client"]: pd.read_parquet(data / c["val_file"]) for c in clients}
+    ds_of = {c["client"]: c["dataset_id"] for c in clients}
+    shared = len(set(ds_of.values())) < len(ds_of)  # nhiều client cùng nguồn -> thêm số client vào tên
     clip = (0.1, 10.0)
     out = res / "baselines"
     out.mkdir(parents=True, exist_ok=True)
     arch_name = ARCH_NAMES.get(a.arch, a.arch)
     fs = meta().get("feature_set", "das")
     if a.mode == "local":
-        jobs = [(f"Local-only[{ds}] · {arch_name} · {fs}", tr[ds], [va[ds]], f"local_{ds}") for ds in tr]
+        jobs = [(f"Local-only[{ds_of[k]} #{k}] · {arch_name} · {fs}" if shared else
+                 f"Local-only[{ds_of[k]}] · {arch_name} · {fs}", tr[k], [va[k]],
+                 f"local_c{k}_{ds_of[k]}" if shared else f"local_{ds_of[k]}") for k in sorted(tr)]
     else:
-        jobs = [(f"Centralized · {arch_name} · {fs}", pd.concat(tr.values(), ignore_index=True), list(va.values()),
-                 "centralized")]
+        by_src = {}
+        for k in sorted(va):
+            by_src.setdefault(ds_of[k], []).append(va[k])
+        jobs = [(f"Centralized · {arch_name} · {fs}", pd.concat([tr[k] for k in sorted(tr)], ignore_index=True),
+                 [pd.concat(v, ignore_index=True) for v in by_src.values()], "centralized")]
     for method, train_df, vals, stem in jobs:
         w = class_weights(train_df["y"].values, len(classes()), clip)
         print(f"{method}: {len(train_df)} mẫu train, weight {np.round(w, 3).tolist()}, {a.epochs} epoch trên {dev}")
