@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('35 pages, 9 stages, 6 appendices',()=>{
-  assert.equal(deck.slides.length,35);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,3,5,9,2]);
+check('34 pages, 9 stages, 6 appendices',()=>{
+  assert.equal(deck.slides.length,34);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,3,5,8,2]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -68,8 +68,8 @@ check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
   changed.slides.forEach(s=>{if(s.id==='results-prox'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,32);assert.equal(d.groups.length,8);
-  assert.equal(d.neighbor('results-prox-mechanism',1),'results-errors');
+  assert.equal(d.slides.length,31);assert.equal(d.groups.length,8);
+  assert.equal(d.neighbor('results-heterogeneity',1),'results-errors');
   assert.equal(d.neighbor('features-map',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
   assert.ok(!d.nav('pipeline').includes('normalize-log'));

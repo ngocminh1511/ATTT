@@ -230,8 +230,8 @@ def validate_snapshot(data):
 
 def validate_content(content):
     slides, stages = content["slides"], content["stages"]
-    if len(stages) != 9 or len(slides) != 35:
-        raise ValueError("Cần 9 giai đoạn, 29 trang chính và 6 phụ lục")
+    if len(stages) != 9 or len(slides) != 34:
+        raise ValueError("Cần 9 giai đoạn, 28 trang chính và 6 phụ lục")
     if len({s["id"] for s in slides}) != len(slides):
         raise ValueError("ID slide bị trùng")
     known = {s["id"] for s in stages} | {"home", "appendix"}
@@ -305,4 +305,4 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true", help="Kiểm tra nội dung và dữ liệu, không ghi file")
     args = parser.parse_args()
     count = build(args.refresh_data, args.check)
-    print(f"OK: {count} trang (29 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")
+    print(f"OK: {count} trang (28 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")

@@ -170,24 +170,14 @@
       "message":"Một lớp Linear chiếu vector đặc trưng thành lưới 8×8 trước các khối ResNet, VGG và Swin.",
       "bullets":["ResNet: học đặc trưng với đường nối tắt","VGG: hai lớp convolution 3×3","Swin: attention cửa sổ thường và cửa sổ dịch"],
       "goal":"Hiểu vai trò kiến trúc và tránh nhầm dữ liệu flow là ảnh gốc.",
-      "speech":"Mô hình nhận vector mười tám hoặc hai mươi ba đặc trưng tùy cấu hình. Một lớp Linear học phép chiếu thành sáu mươi tư giá trị rồi sắp thành lưới tám nhân tám. Lưới này không phải ảnh lưu lượng có sẵn; đây là biểu diễn do mô hình học. Phần ResNet có hai residual block để trích xuất với đường nối tắt. Hai lớp convolution kiểu VGG tiếp tục biến đổi biểu diễn, sau đó hai Swin block học quan hệ trong cửa sổ thường và cửa sổ dịch. Cuối cùng lấy trung bình token và dùng đầu Linear để tạo ba logits. Kiến trúc được triển khai theo hướng tham khảo paper, không khẳng định tái hiện tuyệt đối mọi chi tiết chưa được paper mô tả.",
+      "speech":"Mô hình nhận vector mười tám hoặc hai mươi ba đặc trưng tùy cấu hình. Một lớp Linear học phép chiếu thành sáu mươi tư giá trị rồi sắp thành lưới tám nhân tám. Lưới này không phải ảnh lưu lượng có sẵn; đây là biểu diễn do mô hình học. Phần ResNet có hai residual block để trích xuất với đường nối tắt. Hai lớp convolution kiểu VGG tiếp tục biến đổi biểu diễn, sau đó hai Swin block học quan hệ trong cửa sổ thường và cửa sổ dịch. Cuối cùng lấy trung bình token và dùng đầu Linear để tạo ba logits. Kiến trúc tham khảo bài của Alshdadi và cộng sự năm 2025, không khẳng định tái hiện tuyệt đối mọi chi tiết chưa được bài mô tả. Điểm quan trọng cho phần so sánh: cả tám cấu hình, từ local, centralized đến FedAvg và FedProx, đều dùng đúng mô hình này, chỉ khác số đầu vào, nên khác biệt kết quả đến từ cách học và bộ đặc trưng chứ không đến từ mô hình.",
       "point":"Theo mũi tên qua các khối; nhấn mạnh chữ “lưới học được” tại 8×8.",
-      "transition":"Một lượt forward cho thấy chính xác hình dạng dữ liệu qua từng thành phần.",
+      "transition":"Cùng một kiến trúc này được dùng cho mọi cách học; tiếp theo em so sánh local, centralized và FL.",
+      "defense":"Lưới 8×8 không có ý nghĩa không gian sẵn có như ảnh; lớp Linear học cách sắp 64 giá trị sao cho các khối convolution và attention phía sau khai thác được. Em giữ kiến trúc theo bài tham khảo để so sánh, không khẳng định đây là kiến trúc tối ưu cho dữ liệu dạng bảng; một MLP là hướng đối chứng tiếp theo.",
       "sources":["fl_ddos/models.py: ResVGGSwinNet"]
     },
     {
-      "id":"train-forward","number":"14","stage":"train","enabled":true,"view":"forward",
-      "title":"Theo dõi một lượt forward",
-      "message":"Kích thước dữ liệu thay đổi có chủ đích; đầu ra mô hình là logits, chưa phải xác suất.",
-      "bullets":["B×F → B×1×8×8 → B×32×8×8 → B×64×8×8","64 token, mỗi token 64 chiều → pooling → B×3","Softmax được dùng trong loss hoặc khi dự đoán"],
-      "goal":"Có thể giải thích cách đưa dữ liệu bảng vào kiến trúc và tính xác suất đầu ra.",
-      "speech":"Với batch có B flow và F đặc trưng, đầu vào có hình dạng B nhân F. Sau lớp chiếu và reshape, dữ liệu thành B nhân một nhân tám nhân tám. Phần ResNet tạo ba mươi hai kênh, phần VGG tăng lên sáu mươi bốn kênh mà vẫn giữ lưới tám nhân tám. Khi chuyển sang Swin, sáu mươi tư vị trí trở thành sáu mươi tư token. Trung bình token tạo một vector sáu mươi bốn chiều cho mỗi flow, rồi đầu phân loại xuất ba logits. CrossEntropyLoss nhận logits trực tiếp; lúc đánh giá mới chuyển sang xác suất softmax. Dự đoán ba lớp dùng argmax, còn các nhiệm vụ nhị phân dùng điểm xác suất và ngưỡng riêng.",
-      "point":"Đọc dãy kích thước trên sơ đồ và chỉ vị trí softmax nằm ngoài forward.",
-      "transition":"Cùng một kiến trúc được dùng trong các cách tổ chức huấn luyện khác nhau.",
-      "sources":["fl_ddos/models.py: ResVGGSwinNet.forward","fl_ddos/task.py: train, predict"]
-    },
-    {
-      "id":"train-methods","number":"15","stage":"train","enabled":true,"view":"methods",
+      "id":"train-methods","number":"14","stage":"train","enabled":true,"view":"methods",
       "title":"Local, centralized và FL tổ chức việc học ra sao?",
       "message":"FL cho phép phối hợp học từ hai nguồn bằng cập nhật mô hình; hiệu quả cần được kiểm chứng riêng.",
       "bullets":["Local: mỗi mô hình chỉ học dữ liệu của một client","Centralized: gộp train hai nguồn","FL: train cục bộ rồi tổng hợp trọng số"],
@@ -195,18 +185,32 @@
       "speech":"Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học dữ liệu của một client, tức một nửa train của một nguồn. Centralized gộp train của hai nguồn thành một tập và huấn luyện trực tiếp, là đối chứng khi việc tập trung dữ liệu được phép. FL giữ việc học theo client và phối hợp qua các cập nhật mô hình. Lý do nghiên cứu FL là khả năng học chung mà không cần tập trung dữ liệu thô trong quy trình thuật toán. Điều đó không tự chứng minh riêng tư tuyệt đối, vì cập nhật hoặc thống kê vẫn có thể chứa thông tin. Đồng thời, không có bảo đảm FL luôn chính xác hơn local hay centralized. Phần kết quả sẽ đo riêng hiệu quả và khả năng tổng quát theo từng nguồn.",
       "point":"Chỉ loại thông tin đi trên mũi tên: dữ liệu ở centralized, trọng số ở FL.",
       "transition":"Với FL, mỗi vòng học được thực hiện theo chu trình sau.",
+      "defense":"Centralized là mốc thực nghiệm khi được phép gom dữ liệu, không phải cận trên lý thuyết. FL chỉ gửi trọng số mô hình, nhưng trọng số vẫn có thể rò rỉ thông tin; thí nghiệm không dùng secure aggregation hay differential privacy.",
       "sources":["baselines/multidataset_baselines.py","fl_ddos/multidataset_server.py","https://proceedings.mlr.press/v54/mcmahan17a.html"]
     },
     {
-      "id":"train-round","number":"16","stage":"train","enabled":true,"view":"round",
+      "id":"train-round","number":"15","stage":"train","enabled":true,"view":"round",
       "title":"Một vòng FedAvg: gửi, học, nhận, tổng hợp",
       "message":"Cả bốn client tham gia mỗi vòng; server gộp trọng số theo số mẫu train.",
-      "bullets":["30 vòng × 5 epoch cục bộ; Adam, lr 0,001","Batch 64, dropout 0,3, weighted cross-entropy","50.000 mẫu/client → trọng số tổng hợp 25% mỗi client"],
+      "bullets":["30 vòng × 5 epoch cục bộ; Adam, lr 0,001","Batch 64, dropout 0,3, weighted cross-entropy","50.000 mẫu/client → trọng số tổng hợp 25% mỗi client","Class weight: nghịch đảo tần suất lớp tại client, giới hạn [0,1; 10], lớp vắng = 0"],
       "goal":"Mô tả vòng lặp và phân biệt trọng số client với trọng số lớp trong loss.",
-      "speech":"Đầu vòng, server gửi cùng một mô hình toàn cục đến bốn client. Mỗi client huấn luyện năm epoch trên train của mình, sử dụng Adam và loss có trọng số lớp. Sau đó client gửi trọng số cùng số mẫu, server kiểm tra đủ bốn PID và tổng hợp theo số mẫu thực. Vì bốn client cùng có năm mươi nghìn mẫu train, hệ số ở phép trung bình là một phần tư cho mỗi client; tính theo nguồn thì CIC và UNSW vẫn mỗi bên một nửa. Đây là trọng số tổng hợp mô hình, khác với class weight trong loss. Quy trình lặp ba mươi vòng; sau mỗi lần tổng hợp, mô hình được đánh giá trên validation của bốn client và điểm chọn mô hình là trung bình theo nguồn. Các nút trên hình lần lượt mở từng bước để dễ theo dõi luồng.",
+      "speech":"Đầu vòng, server gửi cùng một mô hình toàn cục đến bốn client. Mỗi client huấn luyện năm epoch trên train của mình, sử dụng Adam và loss có trọng số lớp. Sau đó client gửi trọng số cùng số mẫu, server kiểm tra đủ bốn PID và tổng hợp theo số mẫu thực. Vì bốn client cùng có năm mươi nghìn mẫu train, hệ số ở phép trung bình là một phần tư cho mỗi client; tính theo nguồn thì CIC và UNSW vẫn mỗi bên một nửa. Đây là trọng số tổng hợp mô hình, khác với class weight trong loss ở dải phía dưới: class weight là nghịch đảo tần suất lớp tại từng client, nên lớp càng ít mẫu càng được nhân trọng số lớn. Ví dụ ở UNSW, DoS chỉ chiếm khoảng mười phần trăm nên có trọng số khoảng 2,05, còn ở CIC lớp OTHER_ATTACK không có nên trọng số bằng không. Quy trình lặp ba mươi vòng; sau mỗi lần tổng hợp, mô hình được đánh giá trên validation của bốn client và điểm chọn mô hình là trung bình theo nguồn. Các nút trên hình lần lượt mở từng bước để dễ theo dõi luồng.",
       "point":"Bấm các bước 1–4; đọc công thức FedAvg và phân biệt với bảng class weight.",
-      "transition":"Để so sánh công bằng, em cố định ma trận thí nghiệm và quy tắc chọn checkpoint.",
+      "transition":"FedAvg là cách tổng hợp cơ bản; FedProx sửa phần học tại client để xử lý dữ liệu khác phân phối.",
+      "defense":"Trọng số 25% đến từ FedAvg chuẩn (tỷ lệ số mẫu train) và cả bốn client đều có 50.000 mẫu. Class weight được tính trên train của từng client rồi cố định, không học từ validation hay test.",
       "sources":["fl_ddos/multidataset_server.py","fl_ddos/task.py: train","configs/multidataset.json: fl"]
+    },
+    {
+      "id":"train-fedprox","number":"16","stage":"train","enabled":true,"view":"prox-mechanism",
+      "title":"FedProx: thêm điểm neo cho việc học tại client",
+      "message":"Client tối ưu loss dữ liệu cộng μ/2 · ‖w − w_global‖²; server vẫn tổng hợp theo FedAvg.",
+      "bullets":["Mốc tham chiếu là trọng số toàn cục ở đầu mỗi vòng","μ = 0 trở về loss cục bộ của cấu hình FedAvg","Thí nghiệm dùng μ = 0,1; không phải cơ chế chống đầu độc"],
+      "goal":"Hiểu chính xác vị trí và tác dụng mong muốn của số hạng proximal.",
+      "speech":"FedProx thay đổi mục tiêu học tại client bằng cách cộng một số hạng phạt khoảng cách bình phương từ trọng số hiện tại đến mô hình toàn cục đầu vòng. Client vẫn muốn giảm lỗi trên dữ liệu riêng, đồng thời phải trả chi phí khi đi quá xa điểm khởi đầu chung. Khi μ bằng không thì không còn số hạng này. Trong thử nghiệm, μ là 0,1 và server vẫn dùng phép trung bình có trọng số như FedAvg. Ràng buộc này nhằm xử lý khó khăn tối ưu với dữ liệu không đồng nhất, nhưng không loại bỏ khác biệt miền và không tự bảo đảm chống client độc hại. Tác dụng cuối cùng vẫn phải đọc từ kết quả và các đánh đổi.",
+      "point":"Chỉ hai thành phần loss và sơ đồ điểm neo; hình hướng cập nhật chỉ là minh họa.",
+      "transition":"Với hai cách tổng hợp này, em cố định ma trận thí nghiệm và quy tắc chọn checkpoint.",
+      "defense":"μ = 0,1 nằm trong dải giá trị bài FedProx đã thử (0,001 đến 1); em chưa dò μ bằng validation, đây là một hạn chế. Số hạng proximal chỉ làm chậm việc client trôi khỏi mô hình chung, không phải cơ chế chống client độc hại.",
+      "sources":["fl_ddos/task.py: train","fl_ddos/multidataset_server.py","https://arxiv.org/abs/1812.06127"]
     },
     {
       "id":"train-experiments","number":"17","stage":"train","enabled":true,"view":"experiments",
@@ -217,6 +221,7 @@
       "speech":"Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một centralized DAS và bốn mô hình local DAS, mỗi client một mô hình. Các baseline dùng một trăm năm mươi epoch, tương ứng mốc ba mươi vòng nhân năm epoch cục bộ, nhưng đây không phải bảo đảm các phương pháp có chi phí tính toán hoàn toàn bằng nhau. Best FL và centralized được chọn theo trung bình đều theo nguồn của F1-macro-present trên validation: lấy trung bình hai client cùng nguồn trước, rồi trung bình hai nguồn. Local được chọn theo validation của chính client. Sau khi chốt, một checkpoint được đánh giá trên hai test. Toàn bộ kết quả chính chỉ có seed không, nên chưa có độ lệch chuẩn giữa các lần chạy. FL và local nằm trong một run, centralized chạy riêng nhưng cùng bundle dữ liệu; các job dùng GPU A10 hoặc A10G nên không so sánh tốc độ trực tiếp.",
       "point":"Chỉ các cấu hình cùng DAS và nhánh ALL; chỉ ranh giới validation → chọn best → test.",
       "transition":"Sau khi đã chốt mô hình, em chuyển sang cách đọc và phân tích kết quả.",
+      "defense":"150 epoch cho baseline để tổng số epoch bằng 30 vòng × 5 epoch của FL; đây là cân bằng số lượt học, không phải cân bằng chi phí tính toán. Chỉ có seed 0 nên chưa có độ lệch chuẩn giữa các lần chạy.",
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json","results_modal_multidataset/20261122_235344_298853/status_snapshot.json","baselines/multidataset_baselines.py"]
     },
     {
@@ -284,23 +289,12 @@
       "goal":"Dùng lịch sử thật để đặt vấn đề về tối ưu trong môi trường khác phân phối.",
       "speech":"Biểu đồ hiển thị đủ ba mươi vòng validation, đường CIC và UNSW là trung bình của hai client cùng nguồn. Với FedAvg DAS, CIC đạt gần chín mươi chín phần trăm ngay từ đầu, còn UNSW chỉ tăng từ khoảng mười sáu lên ba mươi hai phần trăm rồi đứng yên; best ở vòng hai mươi lăm. Nhánh ALL cũng có UNSW quanh ba mươi ba phần trăm. Một cách giải thích là phần cập nhật từ hai client CIC và hai client UNSW đi theo hướng khác nhau, và mô hình chung nghiêng về CIC. Khi chuyển sang FedProx, đường UNSW tăng đều đến sáu mươi hai phần trăm ở vòng ba mươi, trong khi CIC chỉ giảm nhẹ. Tuy vậy, đường validation không tự chứng minh nguyên nhân duy nhất; loss, kiến trúc, mất cân bằng và độ lệch train/test cũng có thể góp phần. Lưu ý thêm: validation CIC rất cao nhưng test CIC chỉ khoảng sáu mươi phần trăm, do test CIC lấy từ ngày khác.",
       "point":"Chọn FedAvg DAS để xem khoảng cách CIC/UNSW, rồi chuyển FedProx để thấy đường UNSW đi lên; đây là validation, không phải test theo vòng.",
-      "transition":"FedProx bổ sung một ràng buộc để client không đi quá xa mô hình chung đầu vòng.",
+      "transition":"FedProx, cách học có điểm neo đã giới thiệu ở chương 7, được kiểm chứng trên cùng bộ DAS ở slide tiếp theo.",
       "defense":"Validation CIC cao hơn test CIC nhiều vì test CIC là ngày thu thập khác; em không dùng validation để suy ra điểm test.",
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/fl/*_rounds.csv","results_modal_multidataset/20261122_152058_5ec64a/main/all/fl/*_rounds.csv"]
     },
     {
-      "id":"results-prox-mechanism","number":"24","stage":"results","enabled":true,"view":"prox-mechanism",
-      "title":"FedProx thêm một điểm neo cho quá trình học cục bộ",
-      "message":"Client tối ưu loss dữ liệu cộng μ/2 · ‖w − w_global‖²; server vẫn tổng hợp theo FedAvg.",
-      "bullets":["Mốc tham chiếu là trọng số toàn cục ở đầu mỗi vòng","μ = 0 trở về loss cục bộ của cấu hình FedAvg","Thí nghiệm dùng μ = 0,1; không phải cơ chế chống đầu độc"],
-      "goal":"Hiểu chính xác vị trí và tác dụng mong muốn của số hạng proximal.",
-      "speech":"FedProx thay đổi mục tiêu học tại client bằng cách cộng một số hạng phạt khoảng cách bình phương từ trọng số hiện tại đến mô hình toàn cục đầu vòng. Client vẫn muốn giảm lỗi trên dữ liệu riêng, đồng thời phải trả chi phí khi đi quá xa điểm khởi đầu chung. Khi μ bằng không thì không còn số hạng này. Trong thử nghiệm, μ là 0,1 và server vẫn dùng phép trung bình có trọng số như FedAvg. Ràng buộc này nhằm xử lý khó khăn tối ưu với dữ liệu không đồng nhất, nhưng không loại bỏ khác biệt miền và không tự bảo đảm chống client độc hại. Tác dụng cuối cùng vẫn phải đọc từ kết quả và các đánh đổi.",
-      "point":"Chỉ hai thành phần loss và sơ đồ điểm neo; hình hướng cập nhật chỉ là minh họa.",
-      "transition":"Giữ nguyên bộ DAS, em so sánh kết quả FedProx với FedAvg và centralized.",
-      "sources":["fl_ddos/task.py: train","fl_ddos/multidataset_server.py","https://arxiv.org/abs/1812.06127"]
-    },
-    {
-      "id":"results-prox","number":"25","stage":"results","enabled":true,"view":"prox-results",
+      "id":"results-prox","number":"24","stage":"results","enabled":true,"view":"prox-results",
       "title":"FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng",
       "message":"F1-macro trung bình đạt 56,99%, cao hơn FedAvg DAS 10,10 điểm phần trăm, vẫn thấp hơn centralized 3,90 điểm.",
       "bullets":["UNSW: 34,12% → 60,91%; CIC: 59,65% → 53,07%","F1 DoS/DDoS: 44,98% → 36,01%; FAR mọi tấn công: 3,01% → 16,96%","Best FedProx ở vòng 30 (vòng cuối); một seed nên chưa kết luận ưu thế tổng quát"],
@@ -312,7 +306,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-errors","number":"26","stage":"results","enabled":true,"view":"errors",
+      "id":"results-errors","number":"25","stage":"results","enabled":true,"view":"errors",
       "title":"Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp",
       "message":"Ma trận nhầm lẫn và recall từng lớp cho biết mô hình đang bỏ sót hay nhầm ở đâu.",
       "bullets":["Đọc theo hàng nhãn thật, cột nhãn dự đoán","CIC không có OTHER_ATTACK thật: hàng đó N/A khi chuẩn hóa","Ma trận argmax không thay thế FAR nhị phân ở ngưỡng 0,5"],
@@ -323,7 +317,7 @@
       "sources":["results_modal_multidataset/*/main/*/confusion.csv","results_modal_multidataset/*/main/*/per_class.csv"]
     },
     {
-      "id":"conclusion-summary","number":"27","stage":"conclusion","enabled":true,"view":"contributions",
+      "id":"conclusion-summary","number":"26","stage":"conclusion","enabled":true,"view":"contributions",
       "title":"Đóng góp nằm ở cả pipeline và cách kiểm chứng",
       "message":"Thống nhất dữ liệu, tổ chức học chung và đo đóng góp của từng lựa chọn bằng đối chứng.",
       "bullets":["Pipeline hai nguồn, bốn client: chia tập trước fit, lưu tham số và truy vết","DAS: đầu vào gọn hơn, ít báo động giả hơn nhưng F1 thấp hơn ALL","FedProx: tốt nhất trong FL (56,99%), còn sau centralized và FAR cao hơn"],
@@ -334,7 +328,7 @@
       "sources":["data_paper_multi_4c/main/quality_report.json","results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"conclusion-next","number":"28","stage":"conclusion","enabled":true,"view":"limits",
+      "id":"conclusion-next","number":"27","stage":"conclusion","enabled":true,"view":"limits",
       "title":"Từ kết quả thực nghiệm đến bước phát triển tiếp",
       "message":"Ưu tiên kiểm chứng độ lặp lại và giảm báo động giả trước khi mở rộng kết luận.",
       "bullets":["Chạy nhiều seed; thêm vòng cho FedProx vì best rơi vào vòng cuối","Xem lại DAS khi chia client; chọn ngưỡng / μ trên validation","Rà soát overlap với test và đánh giá thêm dữ liệu độc lập"],
