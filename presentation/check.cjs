@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('37 pages, 9 stages, 6 appendices',()=>{
-  assert.equal(deck.slides.length,37);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,3,2,2,3,5,9,2]);
+check('35 pages, 9 stages, 6 appendices',()=>{
+  assert.equal(deck.slides.length,35);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,3,5,9,2]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -42,7 +42,7 @@ check('source and metric combinations do not lose values',()=>{
     assert.ok(!/NaN|undefined/.test(deck.render('appendix-confusion',{method,testSource,matrixMode})));
   }
   for(const curve of ['das','all','prox'])assert.ok(deck.render('results-heterogeneity',{curve}).includes(`Best vòng ${{das:25,all:13,prox:30}[curve]}`));
-  assert.ok(deck.render('split-clients').includes('CLIENT 4')&&deck.render('train-round',{step:3}).includes('0,25'));
+  assert.ok(['Client 1','Client 2','Client 3','Client 4','18.236','18.237'].every(x=>deck.render('split-clients').includes(x))&&deck.render('train-round',{step:3}).includes('0,25'));
   for(const id of ['local_c1','local_c2','local_c3','local_c4'])assert.ok(deck.render('results-baseline').includes(id==='local_c1'?'CIC #1':id==='local_c2'?'CIC #2':id==='local_c3'?'UNSW #3':'UNSW #4'));
   const prox=data.methods.prox.rounds.at(-1);assert.ok(deck.render('results-heterogeneity',{curve:'prox',round:30}).includes(pct(prox.val_f1mp_unsw_nb15)));
   for(const rankingSource of ['pooled','client_1','client_2','client_3','client_4']){assert.ok(!/NaN/.test(deck.render('select-ranking',{rankingSource})));assert.ok(!/NaN/.test(deck.render('appendix-ranking',{rankingSource})));}
@@ -54,7 +54,6 @@ check('source and metric combinations do not lose values',()=>{
   for(const col of ['Flow Duration','dur','sinpkt / dinpkt','µs ÷ 10⁶','ms ÷ 10³','protocol_group'])assert.ok(schema.includes(col),col);
   for(const cls of data.classes)assert.ok(quality.includes(cls),cls);assert.ok(quality.includes('Loại dòng')&&quality.includes('Gán missing')&&quality.includes('Dừng pipeline'));
   for(const attack of data.dataset_catalog.unsw_nb15.attacks)assert.ok(unsw.includes(attack));
-  for(const example of ['normal','zero','no-bwd'])assert.ok(!/NaN|Infinity/.test(deck.render('features-example',{example})));
 });
 check('hash, forward/back and endpoints',()=>{
   assert.equal(deck.resolveId('#results-prox'),'results-prox');
@@ -69,9 +68,9 @@ check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
   changed.slides.forEach(s=>{if(s.id==='results-prox'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,34);assert.equal(d.groups.length,8);
+  assert.equal(d.slides.length,32);assert.equal(d.groups.length,8);
   assert.equal(d.neighbor('results-prox-mechanism',1),'results-errors');
-  assert.equal(d.neighbor('features-example',1),'select-das');
+  assert.equal(d.neighbor('features-map',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
   assert.ok(!d.nav('pipeline').includes('normalize-log'));
 });

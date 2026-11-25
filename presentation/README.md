@@ -2,7 +2,7 @@
 
 Mở **index.html** bằng trình duyệt. File này chứa giao diện, nội dung dành cho người nghe, số liệu và SVG; có thể chép riêng sang máy khác và dùng offline. Không cần server, Node, CDN hay raw dataset để trình chiếu. Kịch bản lời nói chỉ nằm trong **kich_ban.md**.
 
-Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 31 trang chính (00–30) và 6 trang phụ lục (A1–A6).
+Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 29 trang chính (00–28) và 6 trang phụ lục (A1–A6).
 
 Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải thích lớn. Trang đầu có hình minh họa mạng học liên kết và pipeline SVG với các gói cập nhật chuyển động. Toàn bộ slide chính dùng sơ đồ, ví dụ trực quan hoặc biểu đồ; bảng tham chiếu chi tiết nằm ở phụ lục. Hiệu ứng xuất hiện, đường truyền, bộ lọc và đường học dùng CSS/SVG; tự giảm chuyển động theo thiết lập hệ điều hành.
 

@@ -180,38 +180,67 @@
           body+=edge('M325,155 C410,155 415,70 520,70',C.green,true)+rect(545,25,600,90,'#eaf5ef',16)+tx(570,63,'TEST GIỮ RIÊNG','s-scene-title')+tx(570,94,'CIC: ngày khác · UNSW: testing-set','s-label');
           body+=edge('M325,180 C405,180 410,220 510,220',C.blue,true)+tx(530,170,'POOL TRAIN → 5 FOLD THEO NHÓM','s-axis');
           for(let i=0;i<5;i++)body+=rect(530+i*123,190,105,102,i===0?'#fff0e8':'#eaf0fb',12)+tx(582+i*123,230,`Fold ${i+1}`,'s-label','text-anchor="middle"')+tx(582+i*123,268,i===0?'VAL':'TRAIN','s-axis','text-anchor="middle"');
-          body+=tx(600,341,'Cùng fingerprint → cùng một phía train hoặc validation','s-emphasis','text-anchor="middle"');
-          return frame(body,'Chia test trước và chia train validation theo nhóm')+note('Chia tập → lấy subset → mới fit chuẩn hóa và DAS. Không khẳng định mọi vector train/test đều khác nhau.');
+          return frame(body,'Chia test trước và chia train validation theo nhóm',1200,310);
         }
         case 'sampling':{
-          const partition=state.partition||'train';let body='';
-          const palette=[C.blue,C.coral,C.purple];
-          data.sources.forEach((s,i)=>{
-            const counts=data.quality.used_counts[s][partition],total=Object.values(counts).reduce((a,b)=>a+b,0),y=73+i*158;let x=240;
-            body+=tx(210,y+32,i?'UNSW':'CIC','s-scene-title','text-anchor="end"');
-            data.classes.forEach((cls,j)=>{const val=counts[cls]||0,w=val/total*870;if(w)body+=rect(x,y,w-2,54,palette[j],5);x+=w;});
-            data.classes.forEach((cls,j)=>body+=circle(260+j*290,y+92,5,palette[j])+tx(277+j*290,y+100,`${['BENIGN','DoS/DDoS','OTHER'][j]}: ${n(counts[cls]||0)}`,'s-label'));
+          const pal={BENIGN:C.green,DOS_DDOS:C.blue,OTHER_ATTACK:C.purple},parts=[['train','Train'],['val','Validation'],['test','Test']];
+          let body='',y=22;
+          data.classes.forEach((k,j)=>body+=rect(330+j*230,y-12,16,16,pal[k],4)+tx(354+j*230,y+2,k,'s-label'));
+          y+=30;
+          data.sources.forEach((src,si)=>{
+            body+=tx(40,y+20,si?'UNSW-NB15':'CIC-DDoS2019','s-scene-title');y+=36;
+            parts.forEach(([key,name])=>{
+              const counts=data.quality.used_counts[src][key],total=Object.values(counts).reduce((a,b)=>a+b,0);let x=330;
+              body+=tx(300,y+25,`${name} · ${n(total)}`,'s-label','text-anchor="end"');
+              data.classes.forEach(k=>{const v=counts[k]||0,w=v/total*830;if(!w)return;body+=rect(x,y,w-3,36,pal[k],5);if(w>95)body+=tx(x+w/2,y+25,n(v),'s-bar-value','text-anchor="middle"');x+=w;});
+              y+=46;
+            });
+            y+=10;
           });
-          return controls(select('partition','Subset',[['train','Train · 100.000 / nguồn'],['val','Validation · 20.000 / nguồn'],['test','Test · 50.000 / nguồn']],partition))+frame(body,'Phân bố nhãn thực tế trong từng subset',1200,345)+note('UNSW train DoS: 9.811 mẫu thật, không nhân bản để đạt sàn 10.000.');
+          return frame(body,'Số mẫu theo lớp trong từng tập của mỗi nguồn',1200,y+4);
+        }
+        case 'clients':{
+          // Gộp "lấy subset" và "chia client": subset theo nguồn → cơ chế chia → bằng chứng hai client bằng nhau.
+          const split=data.quality.client_split||{},counts=split.counts_by_original_label||{},used=data.quality.used_counts;
+          const pal={BENIGN:C.green,DOS_DDOS:C.blue,OTHER_ATTACK:C.purple},short={BENIGN:'BENIGN',DOS_DDOS:'DoS/DDoS',OTHER_ATTACK:'OTHER_ATTACK'};
+          const total=o=>Object.values(o||{}).reduce((s,v)=>s+v,0),src0=used[data.sources[0]];
+          const legend=`<div class="cs-legend">${data.classes.map(k=>`<span><i style="background:${pal[k]}"></i>${short[k]}</span>`).join('')}</div>`;
+          const strip=`<div class="cs-strip">
+              <div class="cs-step"><b>Subset mỗi nguồn</b><span>${n(total(src0.train))} train · ${n(total(src0.val))} val · ${n(total(src0.test))} test · không nhân bản</span></div><em>→</em>
+              <div class="cs-step"><b>Trong từng nhãn gốc</b><span>xáo bằng seed ${e(split.seed??'')}, chia lần lượt</span><span class="cs-seq">${[0,1,0,1,0,1].map(k=>`<i class="${k?'b':'a'}">${k+1}</i>`).join('')}<small>…</small></span></div><em>→</em>
+              <div class="cs-step"><b>2 client / nguồn</b><span>Test không chia, giữ theo nguồn</span></div></div>`;
+          const block=(src,si)=>{
+            const cs=data.clients.filter(c=>c.dataset_id===src),[a,b]=cs.map(c=>counts[`client_${c.client}`]||{});
+            const bars=[['train','Train'],['val','Val'],['test','Test']].map(([k,name])=>{const cnt=used[src][k]||{},t=total(cnt);
+              return `<div class="cs-bar"><span>${name} · ${n(t)}</span><div>${data.classes.filter(c=>cnt[c]>0).map(c=>{const p=cnt[c]/t*100;return `<i style="flex:${cnt[c]};background:${pal[c]}" title="${short[c]}: ${n(cnt[c])}">${p>=7?Math.round(p)+'%':''}</i>`;}).join('')}</div></div>`;}).join('');
+            const missing=data.classes.filter(c=>!(used[src].train[c]>0)),present=data.classes.filter(c=>used[src].train[c]>0);
+            const rare=present.reduce((m,c)=>used[src].train[c]<used[src].train[m]?c:m,present[0]);
+            const note=missing.length?`Không có lớp ${missing.map(c=>short[c]).join(', ')}`:`${short[rare]} ít nhất: ${n(used[src].train[rare])} mẫu train thật, giữ toàn bộ`;
+            const labels=Object.entries(a.train||{}).sort((x,y)=>y[1]-x[1]);
+            const maxDiff=Math.max(0,...['train','val'].flatMap(sp=>Object.keys({...a[sp],...b[sp]}).map(l=>Math.abs((a[sp]?.[l]||0)-(b[sp]?.[l]||0)))));
+            const ex=[labels[0],labels.at(-1)].filter(Boolean).map(([l,v])=>`<span><em>${e(l)}</em>${n(v)} · ${n(b.train?.[l]||0)}</span>`).join('');
+            return `<section class="cs-block" style="--accent:${si?C.coral:C.blue}"><header><h3>${si?'UNSW-NB15':'CIC-DDoS2019'}</h3></header>
+              <div class="cs-bars">${bars}</div><p class="cs-note">${e(note)}</p>
+              <div class="cs-clients">${cs.map((c,k)=>`<div class="cs-client ${k?'b':'a'}"><strong>Client ${c.client}</strong><span>${n(c.n_train)} train · ${n(c.n_val)} val</span></div>`).join('')}</div>
+              <div class="cs-proof"><b>${labels.length} nhãn gốc · lệch tối đa ${maxDiff} mẫu/nhãn</b>${ex}</div></section>`;
+          };
+          const purpose=`<div class="cs-purpose"><b>Mục đích</b><span>Hai client cùng nguồn có <strong>cùng phân bố nhãn</strong> (lệch ≤ 1 mẫu mỗi nhãn) và nhận <strong>các dòng rời nhau</strong>: không dòng nào thuộc cả hai client. Khác biệt thật nằm giữa CIC và UNSW.</span></div>`;
+          return `<div class="cs-merged">${strip}${legend}<div class="cs-wrap">${data.sources.map(block).join('')}</div>${purpose}</div>`;
         }
         case 'feature-map':{
-          const xs=[145,445,745,1045];
-          let body='';
-          [['8','Trường cơ sở','data'],['17','Đặc trưng liên tục','features'],['6','Cột cố định','normalize'],['23','Đầu vào ALL','train']].forEach(([val,label,kind],i)=>{
-            const x=xs[i];body+=icon(kind,x-35,50,70,i===3?C.green:C.blue)+tx(x,199,val,'s-giant','text-anchor="middle"')+tx(x,245,label,'s-label','text-anchor="middle"');
-            if(i<3)body+=tx(x+150,190,i===1?'+':i===2?'=':'→','s-operator','text-anchor="middle"');
-          });
-          body+=lines(600,312,['Tốc độ = số lượng / thời gian · tỷ lệ = một chiều / tổng','Cột cố định: 4 giao thức + 2 cờ duration'],'s-emphasis',30,'text-anchor="middle"');
-          return frame(body,'Tạo các nhóm đặc trưng từ tám trường cơ sở');
-        }
-        case 'feature-example':{
-          const mode=state.example||'normal',duration=mode==='zero'?0:2,bwd=mode==='no-bwd'?0:2,bytes=bwd?400:0;
-          let body=icon('server',40,60,85)+icon('server',1065,60,85,C.coral)+tx(85,182,'Nguồn','s-label','text-anchor="middle"')+tx(1108,182,'Đích','s-label','text-anchor="middle"');
-          for(let i=0;i<8;i++)body+=rect(260+i*75,64,35,23,C.blue,5,`class="packet-forward" style="--order:${i}"`);
-          for(let i=0;i<bwd;i++)body+=rect(490+i*110,116,35,23,C.coral,5,'class="packet-backward"');
-          body+=tx(600,42,`8 gói / 800 byte →   ← ${bwd} gói / ${bytes} byte`,'s-scene-title','text-anchor="middle"')+tx(600,185,`Thời lượng: ${duration} giây`,'s-label','text-anchor="middle"');
-          [['Tổng gói',n(8+bwd)],['Gói / giây',duration?n((8+bwd)/duration,1):'missing'],['Byte / giây',duration?n((800+bytes)/duration):'missing'],['Byte / gói về',bwd?'200':'missing']].forEach(([label,val],i)=>body+=tx(155+i*295,267,val,'s-number','text-anchor="middle"')+tx(155+i*295,309,label,'s-label','text-anchor="middle"'));
-          return controls(select('example','Ví dụ giả định',[['normal','Flow hợp lệ'],['zero','Duration = 0'],['no-bwd','Không có gói chiều về']],mode))+frame(body,'Ví dụ tạo đặc trưng từ flow giả định')+note('Minh họa phép tính, không phải số liệu đo. Mẫu số không hợp lệ → missing; không tự gán rate = 0.');
+          const c=x=>`<code>${e(x)}</code>`;
+          const base=['duration_s','fwd_packets','bwd_packets','fwd_bytes','bwd_bytes','fwd_iat_mean_s','bwd_iat_mean_s'];
+          const groups=[
+            ['Tổng hai chiều',[['total_packets','fwd + bwd packets'],['total_bytes','fwd + bwd bytes']]],
+            ['Tốc độ · chia duration',[['flow_packets_s','total_packets / s'],['fwd_packets_s','fwd_packets / s'],['bwd_packets_s','bwd_packets / s'],['flow_bytes_s','total_bytes / s']]],
+            ['Tỷ lệ chiều về',[['bwd_packet_fraction','bwd / total packets'],['bwd_byte_fraction','bwd / total bytes']]],
+            ['Kích thước gói TB',[['fwd_packet_size_mean','fwd_bytes / fwd_packets'],['bwd_packet_size_mean','bwd_bytes / bwd_packets']]]];
+          const fixed=[['proto_tcp','one-hot giao thức'],['proto_udp',''],['proto_icmp',''],['proto_other',''],['duration_missing','cờ: duration thiếu'],['duration_zero','cờ: duration = 0']];
+          const colA=`<section class="fm-col"><header><b>8</b>Trường cơ sở</header><div class="fm-list">${base.map(x=>`<div class="fm-item keep">${c(x)}<span>giữ nguyên</span></div>`).join('')}<div class="fm-item proto">${c('protocol_group')}<span>→ one-hot</span></div></div></section>`;
+          const colB=`<section class="fm-col mid"><header><b>10</b>Đặc trưng tạo thêm</header>${groups.map(([g,items])=>`<div class="fm-group"><small>${g}</small>${items.map(([k,f])=>`<div class="fm-item new">${c(k)}<span>${e(f)}</span></div>`).join('')}</div>`).join('')}</section>`;
+          const colC=`<section class="fm-col fix"><header><b>6</b>Cột cố định (0/1)</header><div class="fm-list">${fixed.map(([k,f])=>`<div class="fm-item fixed">${c(k)}${f?`<span>${e(f)}</span>`:''}</div>`).join('')}</div></section>`;
+          const total=`<div class="fm-total"><span><b>7</b> giữ nguyên</span><i>+</i><span><b>10</b> tạo thêm</span><i>=</i><span class="k"><b>17</b> liên tục</span><i>+</i><span class="f"><b>6</b> cố định</span><i>=</i><span class="all"><b>23</b> đầu vào ALL</span></div>`;
+          return `<div class="fm-wrap"><div class="fm-grid">${colA}<b class="fm-arrow">→</b>${colB}<b class="fm-arrow">+</b>${colC}</div>${total}</div>`;
         }
         case 'logarithm':{
           let body='';
@@ -282,19 +311,19 @@
         case 'methods':{
           let body='';
           ['Local-only','Centralized','Federated'].forEach((s,i)=>body+=tx(200+i*400,33,s,'s-scene-title','text-anchor="middle"'));
-          [[105,185],[295,185]].forEach(([x,y])=>body+=icon('server',x-28,y-28,56,C.gray)+icon('train',x-20,80,40,C.gray));
+          [[80,C.blue],[160,C.blue],[240,C.coral],[320,C.coral]].forEach(([x,col])=>body+=icon('server',x-22,163,44,col)+icon('train',x-16,85,32,C.gray)+edge(`M${x},160L${x},125`,C.gray,true));
           body+=icon('data',470,168,60,C.coral)+icon('data',650,168,60,C.coral)+icon('server',555,68,70,C.purple)+edge('M505,167L570,130',C.coral,true)+edge('M680,167L625,130',C.coral,true);
-          body+=icon('server',875,175,65)+icon('server',1060,175,65,C.coral)+icon('train',967,68,66,C.green);
-          ['M920,175L985,135','M1080,175L1020,135'].forEach((d,i)=>body+=edge(d,i?C.coral:C.blue,true)+pulse(d,i?C.coral:C.blue,-i));
-          body+=lines(200,296,['Hai mô hình riêng','Mỗi nguồn tự học'],'s-label',31,'text-anchor="middle"')+lines(600,296,['Gửi dữ liệu train','Một nơi huấn luyện'],'s-label',31,'text-anchor="middle"')+lines(1000,296,['Gửi cập nhật mô hình','Phối hợp học chung'],'s-label',31,'text-anchor="middle"');
+          body+=icon('train',967,68,66,C.green);
+          [[850,C.blue],[935,C.blue],[1065,C.coral],[1150,C.coral]].forEach(([x,col],k)=>{const d=`M${x},170L${k<2?985:1015},138`;body+=icon('server',x-22,175,44,col)+edge(d,col,true)+pulse(d,col,-k*.5);});
+          body+=lines(200,296,['Bốn mô hình riêng','Mỗi client tự học'],'s-label',31,'text-anchor="middle"')+lines(600,296,['Gửi dữ liệu train','Một nơi huấn luyện'],'s-label',31,'text-anchor="middle"')+lines(1000,296,['Gửi cập nhật mô hình','Phối hợp học chung'],'s-label',31,'text-anchor="middle"');
           return frame(body,'So sánh trực quan ba cách tổ chức học')+note('FL không tự bảo đảm riêng tư tuyệt đối. Chất lượng dự đoán được kiểm chứng bằng thí nghiệm.');
         }
         case 'round':{
           const s=Number(state.step||0)%4,steps=['Gửi mô hình','Học tại client','Gửi cập nhật','Tổng hợp'],y=157;
-          const cx=[[110,80],[260,230],[940,230],[1090,80]];let body=circle(600,y,78,'#e9f0fd')+icon('train',558,y-44,85,C.green);
+          const cx=[[110,80],[260,230],[1090,80],[940,230]];let body=circle(600,y,78,'#e9f0fd')+icon('train',558,y-44,85,C.green);
           cx.forEach(([x,yy],i)=>body+=icon('server',x-34,yy-34,68,i<2?C.blue:C.coral)+tx(x,yy+52,`Client ${i+1}`,'s-axis','text-anchor="middle"'));
           body+=tx(185,335,'CIC · mỗi client n = 50.000','s-label','text-anchor="middle"')+tx(1015,335,'UNSW · mỗi client n = 50.000','s-label','text-anchor="middle"')+tx(600,291,steps[s],'s-scene-title','text-anchor="middle"');
-          if(s===0||s===2){const ends=[[150,95],[300,215],[900,215],[1050,95]],hub=[[525,135],[530,185],[670,185],[675,135]];ends.forEach(([x,yy],i)=>{const [hx,hy]=hub[i],d=s===0?`M${hx},${hy}L${x},${yy}`:`M${x},${yy}L${hx},${hy}`;body+=edge(d,i<2?C.blue:C.coral,true)+pulse(d,i<2?C.blue:C.coral,-i*.5);});}
+          if(s===0||s===2){const ends=[[150,95],[300,215],[1050,95],[900,215]],hub=[[525,135],[530,185],[675,135],[670,185]];ends.forEach(([x,yy],i)=>{const [hx,hy]=hub[i],d=s===0?`M${hx},${hy}L${x},${yy}`:`M${x},${yy}L${hx},${hy}`;body+=edge(d,i<2?C.blue:C.coral,true)+pulse(d,i<2?C.blue:C.coral,-i*.5);});}
           if(s===1){cx.forEach(([x,yy],i)=>body+=circle(x,yy,50,'none',`stroke="${i<2?'#2459c4':'#c34d35'}" stroke-width="3" stroke-dasharray="10 8" class="spin-ring"`));}
           if(s===3)body+=tx(600,48,'w mới = 0,25 (w₁ + w₂ + w₃ + w₄)','s-formula','text-anchor="middle"');
           return `<div class="phase-controls">${steps.map((t,i)=>`<button data-action="step" data-value="${i}" aria-pressed="${s===i}"><span>${i+1}</span>${t}</button>`).join('')}</div><span class="round-step-label">BƯỚC ${s+1} / 4</span>`+frame(body,'Một vòng FedAvg tương tác')+`<div class="criteria-strip"><span><b>30</b> vòng</span><span><b>5</b> epoch / vòng</span><span>Adam · lr <b>0,001</b></span><span>batch <b>64</b> · dropout <b>0,3</b></span></div>`;

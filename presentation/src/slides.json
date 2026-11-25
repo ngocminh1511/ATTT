@@ -72,64 +72,43 @@
       "sources":["fl_ddos/dataset_adapters.py: finalize, protocol_group","fl_ddos/multidataset_prep.py: PrepError nhãn lạ","data_paper_multi_4c/main/quality_report.json"]
     },
     {
-      "id":"split-clients","number":"05","stage":"split","enabled":true,"view":"clients",
-      "title":"Mỗi nguồn dữ liệu chia cho hai client",
-      "message":"CIC và UNSW vẫn tách riêng; trong mỗi nguồn, train và validation chia đều cho hai client theo nhãn gốc.",
-      "bullets":["Client 1, 2 · partition 0, 1 · CIC-DDoS2019","Client 3, 4 · partition 2, 3 · UNSW-NB15","Mỗi client 50.000 train / 10.000 validation; test giữ theo nguồn"],
-      "goal":"Làm rõ ranh giới dữ liệu, cách chia bốn client và tổ chức mô phỏng federated learning.",
-      "speech":"Bản hiện tại dùng bốn client. Hai client đầu, partition 0 và 1, giữ dữ liệu CIC; hai client sau, partition 2 và 3, giữ dữ liệu UNSW. Trong mỗi nguồn, train và validation được chia đều cho hai client bằng cách phân tầng theo nhãn gốc, xếp vòng với seed cố định, nên mỗi client có năm mươi nghìn mẫu train và mười nghìn mẫu validation với tỷ lệ nhãn gần như nhau. Như vậy hai client cùng nguồn gần IID với nhau, còn khác biệt lớn vẫn nằm giữa CIC và UNSW: loại tấn công, tỷ lệ lớp và cách đo flow. Server kiểm tra nhận đủ bốn phản hồi đúng PID ở mỗi vòng. Test không chia theo client mà giữ theo nguồn, và cùng một checkpoint toàn cục được chấm trên hai test. Các client chạy trên cùng hạ tầng mô phỏng; hình mô tả tổ chức logic, không khẳng định cách ly vật lý.",
-      "point":"Chỉ hai khối nguồn, mỗi khối hai client với số mẫu bằng nhau; dữ liệu không đi qua mũi tên cập nhật mô hình.",
-      "transition":"Bên trong mỗi nguồn, trước khi chia client, em tách dữ liệu học, chọn mô hình và kiểm tra cuối cùng.",
-      "defense":"Chia hai client trong cùng nguồn làm tăng số bên tham gia nhưng không tạo thêm khác biệt phân phối; khác biệt chính vẫn là giữa hai nguồn.",
-      "sources":["configs/multidataset.json: clients, client_split","fl_ddos/multidataset_prep.py: chia client phân tầng","data_paper_multi_4c/main/dataset_manifest.json","fl_ddos/multidataset_server.py: pid_map"]
-    },
-    {
-      "id":"split-groups","number":"06","stage":"split","enabled":true,"view":"split",
-      "title":"Chia tập trước mọi bước học tham số",
-      "message":"Test giữ riêng theo nguồn; train/validation được phân tầng theo nhóm fingerprint.",
+      "id":"split-groups","number":"05","stage":"split","enabled":true,"view":"split",
+      "title":"Tách test & validation",
+      "message":"Test giữ riêng theo nguồn; phần còn lại chia train/validation theo nhóm fingerprint.",
       "bullets":["Test CIC theo nhóm file/ngày khác; UNSW dùng testing-set có sẵn","Train/val: StratifiedGroupKFold, 5 fold, seed 42","Cùng fingerprint không nằm ở cả train và validation"],
       "goal":"Hiểu quy tắc tách tập và giới hạn của kiểm tra độc lập dữ liệu.",
-      "speech":"Test được giữ riêng từ đầu theo quy ước nguồn: CIC dùng hai nhóm file tương ứng các ngày khác nhau, còn UNSW dùng tập testing đã cung cấp. Phần pool còn lại được chia train và validation bằng StratifiedGroupKFold. Fingerprint được tạo từ vector đo gốc, không dùng nhãn hoặc ID; các dòng cùng fingerprint nằm cùng nhóm nên không đi sang hai phía train và validation. Hệ thống chọn fold validation có đủ lớp có mặt trong nguồn. Báo cáo hiện tại xác nhận không có nhóm giao nhau giữa train và validation. Tuy vậy, vẫn có vector trùng với test được báo cáo riêng; không được kết luận toàn bộ train/test hoàn toàn không trùng chỉ từ phép kiểm tra train/validation.",
+      "speech":"Bước đầu tiên là giữ riêng tập test: CIC dùng ngày thu thập khác, UNSW dùng testing-set có sẵn. Phần còn lại chia train và validation bằng năm fold theo nhóm fingerprint, nên các dòng trùng giá trị đo luôn nằm cùng một phía. Mọi bước học tham số như chuẩn hóa hay chọn đặc trưng chỉ làm sau bước này.",
       "point":"Chỉ test tách trước, năm fold, và hai mẫu cùng màu luôn ở cùng phía.",
-      "transition":"Sau khi chia, em giới hạn số mẫu và kiểm soát độ đại diện của từng lớp.",
-      "defense":"Không nói chia ngẫu nhiên 80/20 cho toàn bộ dữ liệu; quota cuối cùng còn thay đổi số mẫu từng tập.",
+      "transition":"Từ các tập đã tách, em lấy một subset có kiểm soát cho mỗi nguồn.",
+      "defense":"Dùng StratifiedGroupKFold 5 fold, seed 42; fingerprint tạo từ vector đo gốc, không dùng nhãn hay ID. Báo cáo xác nhận không có nhóm giao nhau giữa train và validation. Vẫn có vector trùng với test được báo cáo riêng, nên không khẳng định train/test tuyệt đối khác nhau.",
       "sources":["fl_ddos/multidataset_prep.py: split_train_val, build_splits, independence_checks"]
     },
     {
-      "id":"split-sampling","number":"07","stage":"split","enabled":true,"view":"sampling",
-      "title":"Lấy subset có kiểm soát, không nhân bản mẫu",
-      "message":"Mỗi nguồn dùng 100.000 train, 20.000 validation và 50.000 test trong bản main.",
-      "bullets":["Train: đặt sàn lớp rồi phân bổ phần ngân sách còn lại","Val/test: quota theo tỷ lệ lớp tự nhiên của nguồn","UNSW DoS chỉ có 9.811 mẫu train thật: giữ toàn bộ"],
-      "goal":"Phân biệt lấy mẫu, cân bằng bằng loss và sinh thêm mẫu.",
-      "speech":"Chính sách lấy mẫu hiện tại đặt sàn mười nghìn mẫu cho mỗi lớp có mặt trong train, sau đó phân bổ ngân sách còn lại theo số lượng gốc. UNSW chỉ có 9.811 mẫu DoS trong phần train khả dụng nên hệ thống giữ toàn bộ và ghi cảnh báo, không nhân bản để đạt sàn. Validation và test giữ tỷ lệ lớp của nguồn, đồng thời bảo đảm support tối thiểu khi có đủ mẫu thật. Với lần chuẩn bị này, mỗi nguồn đạt một trăm nghìn train, hai mươi nghìn validation và năm mươi nghìn test. Sau đó phần train và validation của mỗi nguồn mới được chia đôi cho hai client, mỗi client năm mươi nghìn train và mười nghìn validation. Đây là các subset, không phải toàn bộ benchmark. Mất cân bằng còn lại được phản ánh trong class weight ở bước huấn luyện.",
-      "point":"Đọc hàng UNSW DOS_DDOS và tổng mẫu từng cột; nhấn mạnh không có augmentation.",
-      "transition":"Từ các trường cơ sở của những mẫu đã chọn, em xây dựng vector đặc trưng.",
-      "sources":["data_paper_multi_4c/main/sampling_report.md","fl_ddos/multidataset_sampling.py"]
+      "id":"split-clients","number":"06","stage":"split","enabled":true,"view":"clients",
+      "title":"Lấy subset & chia 4 client",
+      "message":"Mỗi nguồn lấy 100.000 train / 20.000 val / 50.000 test, rồi chia train và val cho hai client theo từng nhãn gốc.",
+      "bullets":["Subset: train đặt sàn lớp rồi chia theo tỷ lệ gốc; val/test giữ tỷ lệ tự nhiên; không nhân bản mẫu","Chia client: trong từng nhãn gốc xáo bằng seed rồi chia lần lượt 1, 2, 1, 2…; không chia theo giao thức","Mục đích: hai client cùng nguồn có cùng phân bố nhãn (lệch ≤ 1 mẫu/nhãn) và nhận các dòng rời nhau","Test không chia theo client, giữ theo nguồn"],
+      "goal":"Gộp bước lấy subset với cơ chế chia client; nói rõ chia theo gì, để làm gì, và non-IID nằm ở đâu.",
+      "speech":"Từ các tập đã tách, mỗi nguồn em lấy một subset cố định: một trăm nghìn train, hai mươi nghìn validation, năm mươi nghìn test, lấy mẫu thật và không nhân bản. Train đặt sàn cho mỗi lớp rồi chia phần còn lại theo tỷ lệ gốc; validation và test giữ tỷ lệ tự nhiên. Nhìn thanh màu thấy ngay hai nguồn lệch nhãn rất mạnh: CIC không có lớp OTHER_ATTACK, còn UNSW chỉ có khoảng mười phần trăm DoS, và em giữ toàn bộ 9.811 mẫu DoS thật. Sau đó train và validation của mỗi nguồn được chia cho hai client. Em không chia theo giao thức mà chia theo nhãn gốc: trong từng nhãn như DrDoS_NTP hay Exploits, các dòng được xáo bằng seed rồi chia lần lượt cho client 1, client 2, client 1, client 2. Mục đích là hai client cùng nguồn có cùng phân bố nhãn, mỗi nhãn lệch tối đa một mẫu, kể cả nhãn rất hiếm như WebDDoS, và mỗi dòng chỉ thuộc đúng một client. Như vậy khác biệt dữ liệu thật trong bài nằm giữa CIC và UNSW, không nằm giữa hai client cùng nguồn. Test không chia theo client mà giữ theo nguồn.",
+      "point":"Chỉ dải cơ chế phía trên (subset → chia lần lượt 1, 2 → 2 client), rồi thanh màu CIC/UNSW (thiếu OTHER_ATTACK, ít DoS), cuối cùng dòng 'lệch tối đa 1 mẫu/nhãn' và ô Mục đích.",
+      "transition":"Dữ liệu đã nằm ở từng client; tiếp theo em xây dựng vector đặc trưng cho mỗi flow.",
+      "defense":"Subset không phải toàn bộ benchmark; mất cân bằng còn lại bù bằng class weight trong loss, không sinh thêm mẫu. Chia client là stratified round-robin theo original_label, seed 42, theo từng dòng: mỗi dòng thuộc đúng một client, nhưng hai flow có cùng vector đo (cùng fingerprint) vẫn có thể nằm ở hai client; điều này không gây rò rỉ vì cả hai đều là train, ràng buộc fingerprint đã áp ở ranh giới train/validation. Không tạo non-IID trong cùng nguồn (theo giao thức hay Dirichlet) vì mục tiêu là đo tác động của khác biệt giữa hai nguồn thật. Test không chia theo client; cùng một checkpoint toàn cục được chấm trên test của từng nguồn.",
+      "sources":["data_paper_multi_4c/main/sampling_report.md","fl_ddos/multidataset_prep.py: choose_subsets, split_shards, client_frames","configs/multidataset.json: clients, client_split","data_paper_multi_4c/main/dataset_manifest.json"]
     },
     {
-      "id":"features-map","number":"08","stage":"features","enabled":true,"view":"feature-map",
-      "title":"Tám trường cơ sở tạo thành 23 cột đầu vào",
-      "message":"Bổ sung tốc độ, tỷ lệ và kích thước gói để biểu diễn flow từ nhiều góc độ.",
-      "bullets":["17 cột liên tục: lượng, tốc độ, tỷ lệ, kích thước và IAT","4 cột one-hot giao thức","2 cờ duration_missing và duration_zero"],
+      "id":"features-map","number":"07","stage":"features","enabled":true,"view":"feature-map",
+      "title":"8 trường cơ sở → 23 cột đầu vào",
+      "message":"Giữ 7 trường số, tạo thêm 10 đặc trưng; giao thức và cờ duration thành 6 cột cố định.",
+      "bullets":["7 trường số giữ nguyên + 10 đặc trưng tạo thêm = 17 cột liên tục","Tạo thêm: tổng, tốc độ, tỷ lệ chiều về, kích thước gói trung bình","6 cột cố định: 4 one-hot giao thức + duration_missing + duration_zero"],
       "goal":"Cho thấy nguồn gốc từng nhóm đặc trưng và tách cột cố định khỏi cột được DAS lọc.",
-      "speech":"Tám trường canonical chưa phải vector cuối cùng. Từ số gói và byte theo hai chiều, hệ thống tạo tổng số gói, tổng byte, tốc độ theo giây, kích thước gói trung bình và các tỷ lệ theo chiều. Kết quả có mười bảy cột liên tục. Giao thức được one-hot thành bốn cột, và hai cờ bổ sung cho biết duration bị thiếu hoặc bằng không. Sáu cột cố định này không được DAS chọn lọc như nhóm liên tục. Những phép tạo đặc trưng là phép tính theo từng dòng và không học tham số từ validation hoặc test. Thứ tự cột được lưu trong metadata để mọi client và checkpoint dùng cùng một vector.",
-      "point":"Theo sơ đồ 8 → 17 + 6 → 23, chỉ các nhóm đặc trưng có chung nguồn đo.",
-      "transition":"Một ví dụ số sẽ làm rõ cách các đặc trưng mới được tính.",
-      "sources":["fl_ddos/multidataset_prep.py: CONTINUOUS, FIXED, derive"]
+      "speech":"Từ tám trường cơ sở, bảy trường số được giữ nguyên. Em tạo thêm mười đặc trưng chia thành bốn nhóm: tổng hai chiều, tốc độ theo giây, tỷ lệ chiều về và kích thước gói trung bình; cộng lại thành mười bảy cột liên tục. Trường giao thức được one-hot thành bốn cột, thêm hai cờ cho duration thiếu hoặc bằng không, thành sáu cột cố định. Tổng cộng hai mươi ba đầu vào.",
+      "point":"Đi từ trái sang phải: 7 giữ nguyên → 10 tạo thêm theo 4 nhóm → 6 cố định, rồi đọc dải tổng ở dưới.",
+      "transition":"Các đặc trưng này có thang giá trị rất khác nhau, nên bước tiếp theo là chuẩn hóa.",
+      "sources":["fl_ddos/multidataset_prep.py: CONTINUOUS, FIXED, derive"],
+      "defense":"Các phép tính làm theo từng dòng, không học tham số nên không gây rò rỉ giữa train và test. Khi mẫu số bằng 0 hoặc duration thiếu, đặc trưng tương ứng là missing chứ không gán 0. Sáu cột cố định không đi qua DAS."
     },
     {
-      "id":"features-example","number":"09","stage":"features","enabled":true,"view":"feature-example",
-      "title":"Một flow, nhiều cách nhìn về hành vi mạng",
-      "message":"Ví dụ minh họa giúp kiểm tra ý nghĩa phép tính và các trường hợp mẫu số không hợp lệ.",
-      "bullets":["Ví dụ: duration 2 s, 8 gói đi, 2 gói về","Tổng 10 gói → 5 gói/s","Duration = 0: rate không xác định, cờ duration_zero = 1"],
-      "goal":"Giải thích công thức bằng dữ liệu giả định và cách xử lý missing.",
-      "speech":"Em dùng một flow giả định để minh họa, không phải mẫu đo của thí nghiệm. Flow kéo dài hai giây, có tám gói đi, hai gói về, tám trăm byte đi và bốn trăm byte về. Tổng là mười gói và một nghìn hai trăm byte, nên tốc độ là năm gói mỗi giây và sáu trăm byte mỗi giây. Kích thước gói đi trung bình là một trăm byte, tỷ lệ gói về là hai mươi phần trăm. Nếu thời lượng bằng không, tốc độ không được coi là không mà là thiếu, đồng thời duration_zero được bật. Nếu số gói một chiều bằng không, kích thước trung bình chiều đó cũng không xác định. Nút chuyển ví dụ cho thấy những trường hợp này.",
-      "point":"Bấm lần lượt flow hợp lệ, duration bằng 0 và chiều về không có gói.",
-      "transition":"Các giá trị tính được vẫn có thể rất khác thang đo, nên cần bước chuẩn hóa.",
-      "sources":["fl_ddos/multidataset_prep.py: derive","Ví dụ giả định, không dùng làm số liệu kết quả"]
-    },
-    {
-      "id":"normalize-log","number":"10","stage":"normalize","enabled":true,"view":"logarithm",
+      "id":"normalize-log","number":"08","stage":"normalize","enabled":true,"view":"logarithm",
       "title":"log1p nén đuôi lớn của giá trị",
       "message":"Biến đổi ln(1 + x) giữ thứ tự giá trị không âm và giảm khoảng cách ở vùng rất lớn.",
       "bullets":["Ví dụ: 0 → 0; 999 → 6,91; 999.999 → 13,82","Giá trị không hữu hạn hoặc âm được coi là missing","Histogram lấy từ 200.000 mẫu train đã chọn"],
@@ -140,7 +119,7 @@
       "sources":["fl_ddos/multidataset_prep.py: log1p_valid","data_paper_multi_4c/main/prep_params.json và train client_1..4.parquet"]
     },
     {
-      "id":"normalize-afn","number":"11","stage":"normalize","enabled":true,"view":"afn",
+      "id":"normalize-afn","number":"09","stage":"normalize","enabled":true,"view":"afn",
       "title":"AFN học thống kê từ train theo giao thức",
       "message":"Bốn client góp thống kê để có mean/std chung; validation và test chỉ áp dụng lại.",
       "bullets":["Client tính số quan sát, tổng và tổng bình phương hợp lệ","Gộp thống kê theo TCP / UDP / ICMP / OTHER","Missing sau z-score → 0; nhóm thiếu dùng thống kê train dự phòng"],
@@ -152,7 +131,7 @@
       "sources":["fl_ddos/multidataset_prep.py: afn_stats, aggregate_afn, apply_afn"]
     },
     {
-      "id":"select-das","number":"12","stage":"select","enabled":true,"view":"das",
+      "id":"select-das","number":"10","stage":"select","enabled":true,"view":"das",
       "title":"DAS giữ thông tin liên quan, lọc phần dư thừa",
       "message":"CRA xếp hạng theo nhãn; IDF duyệt theo thứ hạng để loại cột trùng thông tin.",
       "bullets":["CRA: trung bình r² với chỉ báo từng lớp có phương sai","IDF: bỏ cột có |r| ≥ 0,9 với cột đã chọn","Relevance > 0,001; tối đa 12 cột liên tục"],
@@ -163,7 +142,7 @@
       "sources":["fl_ddos/multidataset_prep.py: das_stats, das_relevance, das_select"]
     },
     {
-      "id":"select-ranking","number":"13","stage":"select","enabled":true,"view":"ranking",
+      "id":"select-ranking","number":"11","stage":"select","enabled":true,"view":"ranking",
       "title":"Từ tiêu chí đến quyết định giữ hoặc loại",
       "message":"Danh sách thực tế giữ 12 cột liên tục, loại bốn cột dư thừa và một cột ít liên quan.",
       "bullets":["total_bytes tương quan 0,977 với fwd_bytes","total_packets tương quan 0,986 với fwd_packets","bwd_iat_mean_s bị loại do relevance ≤ 0,001"],
@@ -174,7 +153,7 @@
       "sources":["data_paper_multi_4c/main/feature_selection.csv"]
     },
     {
-      "id":"select-sets","number":"14","stage":"select","enabled":true,"view":"feature-sets",
+      "id":"select-sets","number":"12","stage":"select","enabled":true,"view":"feature-sets",
       "title":"ALL và DAS khác nhau ở bộ đầu vào",
       "message":"Cùng split, cùng mẫu và cùng quy trình chuẩn hóa; so sánh 23 với 18 đầu vào.",
       "bullets":["ALL: toàn bộ 17 cột liên tục hợp lệ + 6 cột cố định","DAS: 12 cột liên tục được chọn + 6 cột cố định","Không suy ra mức tiết kiệm thời gian hay truyền thông từ tỷ lệ giảm cột"],
@@ -185,7 +164,7 @@
       "sources":["data_paper_multi_4c/main/features.json","data_paper_multi_4c/main_all/features.json"]
     },
     {
-      "id":"train-architecture","number":"15","stage":"train","enabled":true,"view":"architecture",
+      "id":"train-architecture","number":"13","stage":"train","enabled":true,"view":"architecture",
       "title":"ResVGG-SwinNet học trên biểu diễn của flow",
       "message":"Một lớp Linear chiếu vector đặc trưng thành lưới 8×8 trước các khối ResNet, VGG và Swin.",
       "bullets":["ResNet: học đặc trưng với đường nối tắt","VGG: hai lớp convolution 3×3","Swin: attention cửa sổ thường và cửa sổ dịch"],
@@ -196,7 +175,7 @@
       "sources":["fl_ddos/models.py: ResVGGSwinNet"]
     },
     {
-      "id":"train-forward","number":"16","stage":"train","enabled":true,"view":"forward",
+      "id":"train-forward","number":"14","stage":"train","enabled":true,"view":"forward",
       "title":"Theo dõi một lượt forward",
       "message":"Kích thước dữ liệu thay đổi có chủ đích; đầu ra mô hình là logits, chưa phải xác suất.",
       "bullets":["B×F → B×1×8×8 → B×32×8×8 → B×64×8×8","64 token, mỗi token 64 chiều → pooling → B×3","Softmax được dùng trong loss hoặc khi dự đoán"],
@@ -207,7 +186,7 @@
       "sources":["fl_ddos/models.py: ResVGGSwinNet.forward","fl_ddos/task.py: train, predict"]
     },
     {
-      "id":"train-methods","number":"17","stage":"train","enabled":true,"view":"methods",
+      "id":"train-methods","number":"15","stage":"train","enabled":true,"view":"methods",
       "title":"Local, centralized và FL tổ chức việc học ra sao?",
       "message":"FL cho phép phối hợp học từ hai nguồn bằng cập nhật mô hình; hiệu quả cần được kiểm chứng riêng.",
       "bullets":["Local: mỗi mô hình chỉ học dữ liệu của một client","Centralized: gộp train hai nguồn","FL: train cục bộ rồi tổng hợp trọng số"],
@@ -218,7 +197,7 @@
       "sources":["baselines/multidataset_baselines.py","fl_ddos/multidataset_server.py","https://proceedings.mlr.press/v54/mcmahan17a.html"]
     },
     {
-      "id":"train-round","number":"18","stage":"train","enabled":true,"view":"round",
+      "id":"train-round","number":"16","stage":"train","enabled":true,"view":"round",
       "title":"Một vòng FedAvg: gửi, học, nhận, tổng hợp",
       "message":"Cả bốn client tham gia mỗi vòng; server gộp trọng số theo số mẫu train.",
       "bullets":["30 vòng × 5 epoch cục bộ; Adam, lr 0,001","Batch 64, dropout 0,3, weighted cross-entropy","50.000 mẫu/client → trọng số tổng hợp 25% mỗi client"],
@@ -229,7 +208,7 @@
       "sources":["fl_ddos/multidataset_server.py","fl_ddos/task.py: train","configs/multidataset.json: fl"]
     },
     {
-      "id":"train-experiments","number":"19","stage":"train","enabled":true,"view":"experiments",
+      "id":"train-experiments","number":"17","stage":"train","enabled":true,"view":"experiments",
       "title":"Cố định đối chứng, chọn mô hình bằng validation",
       "message":"Tám checkpoint đại diện cho các cách học và bộ đặc trưng; test không dùng để chọn vòng.",
       "bullets":["FL: ALL / DAS / DAS + FedProx μ=0,1","4 local (mỗi client một mô hình) và centralized dùng DAS, 150 epoch","Một seed 0; best FL theo trung bình F1-macro-present theo nguồn trên validation"],
@@ -240,7 +219,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json","results_modal_multidataset/20261122_235344_298853/status_snapshot.json","baselines/multidataset_baselines.py"]
     },
     {
-      "id":"results-metrics","number":"20","stage":"results","enabled":true,"view":"metrics",
+      "id":"results-metrics","number":"18","stage":"results","enabled":true,"view":"metrics",
       "title":"Ba câu hỏi đánh giá, ba cách đọc kết quả",
       "message":"Không dùng F1 phân loại ba lớp để thay cho F1 phát hiện riêng DoS/DDoS.",
       "bullets":["Ba lớp: argmax, F1-macro-present theo support thật","Mọi tấn công: điểm 1 − P(BENIGN), ngưỡng 0,5","DoS/DDoS: điểm P(DOS_DDOS), ngưỡng 0,5"],
@@ -251,7 +230,7 @@
       "sources":["fl_ddos/multidataset_eval.py: source_metrics, binary_block, evaluate_checkpoint"]
     },
     {
-      "id":"results-baseline","number":"21","stage":"results","enabled":true,"view":"baseline",
+      "id":"results-baseline","number":"19","stage":"results","enabled":true,"view":"baseline",
       "title":"Học liên kết chỉ vượt local rõ rệt khi dùng FedProx",
       "message":"Với cùng DAS, FedAvg đạt 46,89% F1-macro trung bình, ngang local tốt nhất (46,63%); centralized đạt 60,89%.",
       "bullets":["Local CIC #1/#2: 42,07% / 42,00%; Local UNSW #3/#4: 46,63% / 44,02%","FedAvg DAS chỉ hơn local tốt nhất 0,26 điểm phần trăm","Trên nguồn riêng, local vẫn có thể tốt hơn mô hình chung"],
@@ -263,7 +242,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-transfer","number":"22","stage":"results","enabled":true,"view":"transfer",
+      "id":"results-transfer","number":"20","stage":"results","enabled":true,"view":"transfer",
       "title":"Local gặp khó khi chuyển sang nguồn chưa học",
       "message":"Điểm trên miền riêng và khả năng dùng chung trên hai miền là hai mục tiêu khác nhau.",
       "bullets":["Local CIC #1: F1-macro 59,69% trên CIC, 24,45% trên UNSW","Local UNSW #3: 67,80% trên UNSW, 25,47% trên CIC","FedAvg DAS: 59,65% / 34,12% trên CIC / UNSW"],
@@ -274,7 +253,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-all-das","number":"23","stage":"results","enabled":true,"view":"all-das",
+      "id":"results-all-das","number":"21","stage":"results","enabled":true,"view":"all-das",
       "title":"Với 4 client, DAS không nâng F1 tổng hợp",
       "message":"F1-macro trung bình giảm từ 50,70% (ALL) xuống 46,89% (DAS), tương đương 3,81 điểm phần trăm.",
       "bullets":["CIC: 66,72% → 59,65%, giảm 7,07 điểm phần trăm","UNSW: 34,67% → 34,12%, gần như không đổi","Cùng subset và ngân sách; checkpoint được chọn riêng bằng validation"],
@@ -286,7 +265,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv","results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-das-tradeoff","number":"24","stage":"results","enabled":true,"view":"das-tradeoff",
+      "id":"results-das-tradeoff","number":"22","stage":"results","enabled":true,"view":"das-tradeoff",
       "title":"DAS giảm F1, đổi lại ít báo động giả hơn",
       "message":"So với ALL, DAS có F1-macro và F1 DoS/DDoS thấp hơn, nhưng FAR mọi tấn công giảm.",
       "bullets":["F1 DoS/DDoS: 50,26% → 44,98%","FAR mọi tấn công trên BENIGN: 4,45% → 3,01%","Kết luận phụ thuộc nhiệm vụ, nguồn và ngưỡng quyết định"],
@@ -297,7 +276,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv","results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-heterogeneity","number":"25","stage":"results","enabled":true,"view":"heterogeneity",
+      "id":"results-heterogeneity","number":"23","stage":"results","enabled":true,"view":"heterogeneity",
       "title":"Chung đầu vào chưa làm hai nguồn học giống nhau",
       "message":"Với FedAvg, validation UNSW kẹt quanh 32% trong khi CIC gần 99%; FedProx kéo UNSW lên 62%.",
       "bullets":["FedAvg DAS: best vòng 25, UNSW validation chỉ 16% → 32%","FedProx: UNSW tăng dần đến 62% ở vòng 30, CIC giữ khoảng 96%","Khác biệt cập nhật là giả thuyết giải thích, không phải nguyên nhân duy nhất đã chứng minh"],
@@ -309,7 +288,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/fl/*_rounds.csv","results_modal_multidataset/20261122_152058_5ec64a/main/all/fl/*_rounds.csv"]
     },
     {
-      "id":"results-prox-mechanism","number":"26","stage":"results","enabled":true,"view":"prox-mechanism",
+      "id":"results-prox-mechanism","number":"24","stage":"results","enabled":true,"view":"prox-mechanism",
       "title":"FedProx thêm một điểm neo cho quá trình học cục bộ",
       "message":"Client tối ưu loss dữ liệu cộng μ/2 · ‖w − w_global‖²; server vẫn tổng hợp theo FedAvg.",
       "bullets":["Mốc tham chiếu là trọng số toàn cục ở đầu mỗi vòng","μ = 0 trở về loss cục bộ của cấu hình FedAvg","Thí nghiệm dùng μ = 0,1; không phải cơ chế chống đầu độc"],
@@ -320,7 +299,7 @@
       "sources":["fl_ddos/task.py: train","fl_ddos/multidataset_server.py","https://arxiv.org/abs/1812.06127"]
     },
     {
-      "id":"results-prox","number":"27","stage":"results","enabled":true,"view":"prox-results",
+      "id":"results-prox","number":"25","stage":"results","enabled":true,"view":"prox-results",
       "title":"FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng",
       "message":"F1-macro trung bình đạt 56,99%, cao hơn FedAvg DAS 10,10 điểm phần trăm, vẫn thấp hơn centralized 3,90 điểm.",
       "bullets":["UNSW: 34,12% → 60,91%; CIC: 59,65% → 53,07%","F1 DoS/DDoS: 44,98% → 36,01%; FAR mọi tấn công: 3,01% → 16,96%","Best FedProx ở vòng 30 (vòng cuối); một seed nên chưa kết luận ưu thế tổng quát"],
@@ -332,7 +311,7 @@
       "sources":["results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"results-errors","number":"28","stage":"results","enabled":true,"view":"errors",
+      "id":"results-errors","number":"26","stage":"results","enabled":true,"view":"errors",
       "title":"Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp",
       "message":"Ma trận nhầm lẫn và recall từng lớp cho biết mô hình đang bỏ sót hay nhầm ở đâu.",
       "bullets":["Đọc theo hàng nhãn thật, cột nhãn dự đoán","CIC không có OTHER_ATTACK thật: hàng đó N/A khi chuẩn hóa","Ma trận argmax không thay thế FAR nhị phân ở ngưỡng 0,5"],
@@ -343,7 +322,7 @@
       "sources":["results_modal_multidataset/*/main/*/confusion.csv","results_modal_multidataset/*/main/*/per_class.csv"]
     },
     {
-      "id":"conclusion-summary","number":"29","stage":"conclusion","enabled":true,"view":"contributions",
+      "id":"conclusion-summary","number":"27","stage":"conclusion","enabled":true,"view":"contributions",
       "title":"Đóng góp nằm ở cả pipeline và cách kiểm chứng",
       "message":"Thống nhất dữ liệu, tổ chức học chung và đo đóng góp của từng lựa chọn bằng đối chứng.",
       "bullets":["Pipeline hai nguồn, bốn client: chia tập trước fit, lưu tham số và truy vết","DAS: đầu vào gọn hơn, ít báo động giả hơn nhưng F1 thấp hơn ALL","FedProx: tốt nhất trong FL (56,99%), còn sau centralized và FAR cao hơn"],
@@ -354,7 +333,7 @@
       "sources":["data_paper_multi_4c/main/quality_report.json","results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv","results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv"]
     },
     {
-      "id":"conclusion-next","number":"30","stage":"conclusion","enabled":true,"view":"limits",
+      "id":"conclusion-next","number":"28","stage":"conclusion","enabled":true,"view":"limits",
       "title":"Từ kết quả thực nghiệm đến bước phát triển tiếp",
       "message":"Ưu tiên kiểm chứng độ lặp lại và giảm báo động giả trước khi mở rộng kết luận.",
       "bullets":["Chạy nhiều seed; thêm vòng cho FedProx vì best rơi vào vòng cuối","Xem lại DAS khi chia client; chọn ngưỡng / μ trên validation","Rà soát overlap với test và đánh giá thêm dữ liệu độc lập"],
