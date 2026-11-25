@@ -39,11 +39,13 @@
   const phases=(names,current=0)=>`<div class="phase-controls" role="group" aria-label="Các phần minh họa">${names.map((s,i)=>`<button data-action="phase" data-value="${i}" aria-pressed="${i===current}"><span>${String(i+1).padStart(2,'0')}</span>${e(s)}</button>`).join('')}</div>`;
   const metricInfo={f1_macro_present:'F1-macro-present',dos_f1:'F1 DoS/DDoS',attack_f1:'F1 mọi tấn công',attack_recall:'Recall mọi tấn công',dos_recall:'Recall DoS/DDoS',attack_far_benign:'FAR mọi tấn công ↓',acc:'Accuracy',attack_roc_auc:'AUC mọi tấn công'};
   const sources={mean_over_sources:'Trung bình hai nguồn',cicddos2019:'CIC-DDoS2019',unsw_nb15:'UNSW-NB15',worst_source:'Kém nhất theo từng chỉ số',pooled_predictions:'Dự đoán gộp'};
-  const labels={all:'FedAvg · ALL',das:'FedAvg · DAS',prox:'FedProx · DAS',central:'Centralized',local_cic:'Local · CIC',local_unsw:'Local · UNSW'};
-  const colors={all:'#607187',das:C.blue,prox:C.green,central:C.purple,local_cic:C.coral,local_unsw:'#a07322'};
+  const labels={all:'FedAvg · ALL',das:'FedAvg · DAS',prox:'FedProx · DAS',central:'Centralized',local_c1:'Local · CIC #1',local_c2:'Local · CIC #2',local_c3:'Local · UNSW #3',local_c4:'Local · UNSW #4'};
+  const colors={all:'#607187',das:C.blue,prox:C.green,central:C.purple,local_c1:C.coral,local_c2:'#e08a6f',local_c3:'#a07322',local_c4:'#c9a35a'};
+  const LOCALS=['local_c1','local_c2','local_c3','local_c4'];
   const keyMetrics=value=>select('metric','Chỉ số',Object.entries(metricInfo),value);
   const keySource=value=>select('source','Tập đánh giá',Object.entries(sources).filter(([k])=>!['worst_source','pooled_predictions'].includes(k)),value);
 
+  const compareTable=(headers,rows,after=-1)=>`<div class="compare-table"><table><thead><tr>${headers.map((h,i)=>`<th scope="col" class="${i===after?'after':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>i===0?`<th scope="row" class="${i===after?'after':''}">${c}</th>`:`<td class="${i===after?'after':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   function create(ctx){
     const {data,content,groups,byId,row,assets={}}=ctx;
     const phase=state=>Number(state.phase||0);
@@ -61,11 +63,11 @@
         const i=content.stages.findIndex(s=>s.id===g.id),[x,y]=positions[i],kind=['data','clean','split','features','normalize','select','train','results','conclusion'][i];
         body+=`<a href="#${g.slides[0].id}" class="pipeline-stop" style="--order:${i}" aria-label="${e(g.title)}">${circle(x,y,39,i===7?'#e2efff':'#f1f5fb','class="stop-disc"')}${icon(kind,x-22,y-22,44,i===7?C.coral:C.blue)}${tx(x-54,y-35,String(i+1).padStart(2,'0'),'s-stage-index')}${lines(x,y+63,names[i],'s-pipeline-title',24,'text-anchor="middle"')}</a>`;
       });
-      return `<section class="cover"><div class="cover-copy"><p class="eyebrow">ĐỒ ÁN AN TOÀN THÔNG TIN</p><h1>Học liên kết.<br><em>Phát hiện tấn công mạng.</em></h1><p>Hai nguồn dữ liệu. Một mô hình chung.<br>Từ phép đo lưu lượng đến bằng chứng thực nghiệm.</p><div class="cover-facts"><span>CIC-DDoS2019</span><b>+</b><span>UNSW-NB15</span><i>2 client / 3 lớp</i></div></div><div class="cover-art">${assets.network?`<img src="${assets.network}" alt="Minh họa hai mạng cục bộ trao đổi cập nhật với mô hình toàn cục" width="1672" height="941">`:''}<svg viewBox="0 0 800 380" aria-hidden="true"><path d="M120 260Q400 80 680 260"/><circle r="6"><animateMotion dur="4s" repeatCount="indefinite" path="M120 260Q400 80 680 260"/></circle><circle r="5"><animateMotion dur="4s" begin="-2s" repeatCount="indefinite" path="M680 260Q400 80 120 260"/></circle></svg><span class="art-caption">MINH HỌA HỌC LIÊN KẾT</span></div></section><section class="pipeline-map"><div class="pipeline-heading"><span>QUY TRÌNH THỰC HIỆN</span><span>Chọn một giai đoạn để bắt đầu ↘</span></div>${frame(body,'Pipeline chín giai đoạn có đường truyền dữ liệu chuyển động',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span><a href="#${groups[0]?.slides[0].id||'pipeline'}">Bắt đầu trình bày →</a></div>`;
+      return `<section class="cover"><div class="cover-copy"><p class="eyebrow">ĐỒ ÁN AN TOÀN THÔNG TIN</p><h1>Học liên kết.<br><em>Phát hiện tấn công mạng.</em></h1><p>Hai nguồn dữ liệu, bốn client. Một mô hình chung.<br>Từ phép đo lưu lượng đến bằng chứng thực nghiệm.</p><div class="cover-facts"><span>CIC-DDoS2019</span><b>+</b><span>UNSW-NB15</span><i>4 client / 3 lớp</i></div></div><div class="cover-art">${assets.network?`<img src="${assets.network}" alt="Minh họa hai mạng cục bộ trao đổi cập nhật với mô hình toàn cục" width="1672" height="941">`:''}<svg viewBox="0 0 800 380" aria-hidden="true"><path d="M120 260Q400 80 680 260"/><circle r="6"><animateMotion dur="4s" repeatCount="indefinite" path="M120 260Q400 80 680 260"/></circle><circle r="5"><animateMotion dur="4s" begin="-2s" repeatCount="indefinite" path="M680 260Q400 80 120 260"/></circle></svg><span class="art-caption">MINH HỌA HỌC LIÊN KẾT</span></div></section><section class="pipeline-map"><div class="pipeline-heading"><span>QUY TRÌNH THỰC HIỆN</span><span>Chọn một giai đoạn để bắt đầu ↘</span></div>${frame(body,'Pipeline chín giai đoạn có đường truyền dữ liệu chuyển động',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span><a href="#${groups[0]?.slides[0].id||'pipeline'}">Bắt đầu trình bày →</a></div>`;
     }
 
     function bars(keys,metric,source){
-      const x0=285,cw=755,top=47,step=73,h=top+keys.length*step+20;
+      const x0=285,cw=755,top=47,step=keys.length>4?56:73,bh=keys.length>4?32:37,h=top+keys.length*step+20;
       let body='';
       for(let t=0;t<=4;t++){
         const x=x0+t*cw/4;body+=`<line x1="${x}" y1="23" x2="${x}" y2="${h-25}" class="plot-grid"/>`+tx(x,h-3,`${t*25}%`,'s-axis','text-anchor="middle"');
@@ -73,7 +75,7 @@
       keys.forEach((key,i)=>{
         const value=row(key,source)[metric],y=top+i*step;
         body+=tx(x0-22,y+14,labels[key],'s-label','text-anchor="end"');
-        body+=rect(x0,y-10,(value||0)*cw,37,colors[key],5,`class="grow-bar" style="--order:${i}"`)+tx(x0+(value||0)*cw+15,y+18,p(value),'s-value');
+        body+=rect(x0,y-10,(value||0)*cw,bh,colors[key],5,`class="grow-bar" style="--order:${i}"`)+tx(x0+(value||0)*cw+15,y+bh/2,p(value),'s-value');
       });
       return frame(body,`${metricInfo[metric]} · ${sources[source]}`,1200,h);
     }
@@ -86,13 +88,13 @@
       [1,5,10,15,20,25,30].forEach(r=>body+=tx(left+(r-1)/29*pw,bottom+32,r,'s-axis','text-anchor="middle"'));
       const bx=left+(best.round-1)/29*pw;
       body+=`<line x1="${bx}" y1="28" x2="${bx}" y2="${bottom}" stroke="${C.green}" stroke-width="2" stroke-dasharray="5 6"/>`+tx(Math.max(195,Math.min(980,bx)),20,`Best vòng ${best.round}: ${p(best.val_score)}`,'s-chart-note','text-anchor="middle"');
-      [['val_f1mp_pid0','CIC',C.blue],['val_f1mp_pid1','UNSW',C.coral],['val_score','Trung bình',C.green]].forEach(([metric,label,color])=>{
+      [['val_f1mp_cicddos2019','CIC',C.blue],['val_f1mp_unsw_nb15','UNSW',C.coral],['val_score','Trung bình',C.green]].forEach(([metric,label,color])=>{
         const path=rows.map((r,i)=>`${i?'L':'M'}${left+(r.round-1)/29*pw},${bottom-r[metric]*ph}`).join(' ');
         body+=`<path d="${path}" fill="none" stroke="${color}" stroke-width="4" stroke-linejoin="round" class="draw-curve" pathLength="1"/>`;
         rows.forEach(r=>body+=`<circle cx="${left+(r.round-1)/29*pw}" cy="${bottom-r[metric]*ph}" r="5" fill="${color}" class="curve-point"><title>Vòng ${r.round} · ${label}: ${p(r[metric])}</title></circle>`);
         body+=circle(left+(current.round-1)/29*pw,bottom-current[metric]*ph,8,'white',`stroke="${color}" stroke-width="3"`);
       });
-      return frame(body,`30 vòng validation ${labels[key]}`,1200,355)+`<div class="curve-readout"><label>Vòng <strong>${current.round}</strong><input type="range" min="1" max="30" value="${current.round}" data-control="round" aria-label="Vòng validation"></label><span style="--series:${C.blue}">CIC <b>${p(current.val_f1mp_pid0)}</b></span><span style="--series:${C.coral}">UNSW <b>${p(current.val_f1mp_pid1)}</b></span><span style="--series:${C.green}">Trung bình <b>${p(current.val_score)}</b></span></div>`;
+      return frame(body,`30 vòng validation ${labels[key]}`,1200,355)+`<div class="curve-readout"><label>Vòng <strong>${current.round}</strong><input type="range" min="1" max="30" value="${current.round}" data-control="round" aria-label="Vòng validation"></label><span style="--series:${C.blue}">CIC <b>${p(current.val_f1mp_cicddos2019)}</b></span><span style="--series:${C.coral}">UNSW <b>${p(current.val_f1mp_unsw_nb15)}</b></span><span style="--series:${C.green}">Trung bình <b>${p(current.val_score)}</b></span></div>`;
     }
     function confusion(state){
       const key=state.method||'prox',source=state.testSource||'cicddos2019',mode=state.matrixMode||'percent',m=data.methods[key],classes=data.classes;
@@ -120,56 +122,58 @@
       switch(slide.view){
         case 'home':return home();
         case 'dataset-overview':{
-          const ds=data.dataset_catalog;
-          return `<div class="dataset-spread">${data.sources.map((s,i)=>`<section><div class="dataset-emblem">${frame(icon(i?'shield':'data',10,8,90,i?C.coral:C.blue),ds[s].title,110,110)}</div><p class="eyebrow">${i?'UNSW CANBERRA':'UNB · CANADIAN INSTITUTE FOR CYBERSECURITY'}</p><h2>${ds[s].title}</h2><p class="dataset-one-line">${i?'Chín nhóm xâm nhập và lưu lượng bình thường.':'Lưu lượng bình thường và các kịch bản DDoS.'}</p><div class="dataset-big">${n(ds[s].local_rows)} <span>mẫu</span></div><div class="dataset-counts"><span><b>${ds[s].local_columns}</b> cột</span><span><b>${ds[s].local_measurements}</b> đặc trưng</span><span><b>${ds[s].local_files}</b> file ${i?'CSV':'Parquet'}</span></div><p class="dataset-version">${i?'Training 175.341 · Testing 82.332':'Hai ngày: 12/01 và 11/03/2019'}</p></section>`).join('')}</div><div class="evidence-line"><span>TEST TRONG BÀI</span><strong>50.000 CIC + 50.000 UNSW = 100.000 flow</strong></div><p class="figure-caption">Số liệu bản đang dùng. Benchmark UNSW đầy đủ: 2.540.044 mẫu, 49 trường; CIC gốc mô tả hơn 80 đặc trưng.</p>`;
-        }
-        case 'cic-profile':{
-          const d=data.dataset_catalog.cicddos2019;
-          return `<div class="capture-origin"><span>Testbed mạng</span><b>→</b><span>25 người dùng mô phỏng</span><b>→</b><span>PCAP</span><b>→</b><strong>CICFlowMeter-V3</strong></div><div class="day-timeline">${d.days.map((day,i)=>`<section><div class="day-date"><span>NGÀY ${i+1}</span><h2>${day.date}</h2><b>${n(day.rows)} mẫu</b></div><p>${day.role} · ${day.files} file</p>${chips(day.local_attacks)}<small>+ BENIGN${i===0?' · Bản gốc còn mô tả SSDP, bản đang dùng không có SSDP.':''}</small></section>`).join('')}</div><div class="evidence-line"><strong>431.371 flow</strong><span>77 đặc trưng + Label = 78 cột</span><span>Thời lượng · gói/byte · IAT · cờ TCP</span></div>`;
-        }
-        case 'unsw-profile':{
-          const d=data.dataset_catalog.unsw_nb15;
-          return `<div class="capture-origin"><span>IXIA PerfectStorm</span><b>→</b><strong>100 GB PCAP</strong><b>→</b><span>Argus / Bro-IDS</span></div><div class="unsw-spread"><section><p class="eyebrow">9 NHÓM TẤN CÔNG + NORMAL</p><div class="attack-family-grid">${d.attacks.map((s,i)=>`<div><span>${String(i+1).padStart(2,'0')}</span>${s}</div>`).join('')}</div></section><section class="raw-partitions">${d.splits.map(s=>`<div><span>${s.name}</span><strong>${n(s.rows)}</strong><p>${s.role}</p></div>`).join('')}<p><b>45 cột</b> = 42 đặc trưng + id + attack_cat + label</p></section></div><div class="evidence-line"><span>BENCHMARK ĐẦY ĐỦ</span><strong>2.540.044 mẫu · 49 trường</strong><span>Giao thức · dịch vụ · gói/byte · TTL · IAT · jitter</span></div>`;
+          const ds=data.dataset_catalog,lm=data.label_map;
+          const classColor={BENIGN:C.green,DOS_DDOS:C.blue,OTHER_ATTACK:C.purple};
+          const cls=(src,name)=>data.classes.find(k=>lm[src][k].includes(name.toLowerCase()))||'OTHER_ATTACK';
+          const norm=x=>{const y=x.replace(/^DrDoS_/,'');return ({Syn:'SYN','UDP-lag':'UDP-Lag',UDPLag:'UDP-Lag'})[y]||y;};
+          const agg=entries=>{const m=new Map();entries.forEach(([k,v])=>m.set(k,(m.get(k)||0)+v));return [...m].sort((a,b)=>b[1]-a[1]);};
+          const rows={cicddos2019:agg(Object.values(ds.cicddos2019.label_counts).flatMap(d=>Object.entries(d).map(([k,v])=>[norm(k),v]))),
+            unsw_nb15:agg(ds.unsw_nb15.splits.flatMap(x=>Object.entries(x.labels)))};
+          const days=ds.cicddos2019.days,perDay=days.map(d=>{const m={};Object.entries(ds.cicddos2019.label_counts[d.date]).forEach(([k,v])=>{m[norm(k)]=(m[norm(k)]||0)+v;});return m;});
+          const dayHead=days.map(d=>`<span>${e(d.date.slice(0,5))}<small>${/test/i.test(d.role)?'test':'train/val'}</small></span>`).join('');
+          const dayCells=name=>perDay.map((m,i)=>m[name]?`<i class="on" title="${e(days[i].date)}: ${n(m[name])} mẫu"></i>`:`<i class="off" title="${e(days[i].date)}: không có"></i>`).join('');
+          const sub={cicddos2019:'UNB / CIC · 2 ngày thu thập',
+            unsw_nb15:'UNSW Canberra · '+ds.unsw_nb15.splits.map(x=>`${e(x.name)} ${n(x.rows)}`).join(' · ')};
+          const panel=src=>{const d=ds[src],r=rows[src],max=r[0][1],cic=src==='cicddos2019';
+            return `<section class="lbl-panel" style="--accent:${cic?C.blue:C.coral}"><header><h3>${e(d.title)}</h3><span>${sub[src]}</span></header><div class="lbl-stats"><span><b>${n(d.local_rows)}</b> mẫu</span><span><b>${d.local_columns}</b> cột</span></div><div class="lbl-rows${cic?' with-days':''}">${cic?`<div class="lbl-row lbl-head"><span>Nhãn</span>${dayHead}<span></span><span>Tổng</span></div>`:''}${r.map(([name,v])=>`<div class="lbl-row"><span>${e(name)}</span>${cic?dayCells(name):''}<div><i style="width:max(3px,${v/max*100}%);background:${classColor[cls(src,name)]}"></i></div><b>${n(v)}</b></div>`).join('')}</div></section>`;};
+          return `<div class="lbl-legend"><span>Nhãn gom về:</span>${data.classes.map(k=>`<span><i style="background:${classColor[k]}"></i>${k}</span>`).join('')}</div><div class="lbl-panels">${data.sources.map(panel).join('')}</div>`;
         }
         case 'schema':{
-          const groupsMap=[{name:'Thời lượng',left:['Flow Duration'],mid:['duration_s'],right:['dur']},{name:'Gói & byte',left:['Total Fwd Packets','Total Backward Packets','Fwd Packets Length Total','Bwd Packets Length Total'],mid:['fwd_packets','bwd_packets','fwd_bytes','bwd_bytes'],right:['spkts','dpkts','sbytes','dbytes']},{name:'IAT hai chiều',left:['Fwd IAT Mean','Bwd IAT Mean'],mid:['fwd_iat_mean_s','bwd_iat_mean_s'],right:['sinpkt','dinpkt']},{name:'Giao thức',left:['Protocol'],mid:['protocol_group'],right:['proto']}],g=groupsMap[step%4];
-          const start=g.mid.length===4?90:g.mid.length===2?135:165;
-          let body=tx(190,38,'CIC-DDoS2019','s-scene-title','text-anchor="middle"')+tx(600,38,'SCHEMA CHUNG','s-scene-title','text-anchor="middle"')+tx(1010,38,'UNSW-NB15','s-scene-title','text-anchor="middle"');
-          g.mid.forEach((s,i)=>{
-            const y=start+i*60;
-            body+=rect(20,y-30,340,58,'#f3f6fb',10)+tx(190,y+6,g.left[i],'s-field','text-anchor="middle"');
-            body+=rect(440,y-30,320,58,'#e6eefc',10)+tx(600,y+6,s,'s-field canonical-field','text-anchor="middle"');
-            body+=rect(840,y-30,340,58,'#fff1eb',10)+tx(1010,y+6,g.right[i],'s-field','text-anchor="middle"');
-            const a=`M365,${y} L432,${y}`,b=`M835,${y} L768,${y}`;
-            body+=edge(a,C.blue,true)+edge(b,C.coral,true)+pulse(a,C.blue,-i*.7)+pulse(b,C.coral,-i*.7);
-          });
-          body+=tx(600,332,'Cùng ý nghĩa → cùng trường → cùng mô hình','s-emphasis','text-anchor="middle"');
-          return phases(groupsMap.map(s=>s.name),step)+frame(body,'Ánh xạ schema theo từng nhóm trường')+note('8 trường chung: 1 thời lượng + 4 gói/byte + 2 IAT + 1 giao thức. Metadata giữ riêng để truy vết.');
+          const ds=data.dataset_catalog,c=x=>`<code>${e(x)}</code>`,u=x=>`<small>${e(x)}</small>`;
+          const rows=[
+            [c('duration_s')+u('giây'),c('Flow Duration')+u('µs ÷ 10⁶'),c('dur')+u('giây')],
+            [c('fwd_packets / bwd_packets')+u('số gói hai chiều'),c('Total Fwd / Backward Packets'),c('spkts / dpkts')],
+            [c('fwd_bytes / bwd_bytes')+u('số byte hai chiều'),c('Fwd / Bwd Packets Length Total'),c('sbytes / dbytes')],
+            [c('fwd_iat_mean_s / bwd_iat_mean_s')+u('giây'),c('Fwd / Bwd IAT Mean')+u('µs ÷ 10⁶'),c('sinpkt / dinpkt')+u('ms ÷ 10³')],
+            [c('protocol_group')+u('TCP · UDP · ICMP · OTHER'),c('Protocol')+u('số: 6, 17, 1…'),c('proto')+u('chuỗi: tcp, udp…')]];
+          return `<div class="schema-center"><div class="compare-summary"><span>CIC <b>${ds.cicddos2019.local_columns} cột</b> → <b>8 trường</b></span><span>UNSW <b>${ds.unsw_nb15.local_columns} cột</b> → <b>8 trường</b></span></div>`+compareTable(['Sau · trường chung','Trước · CIC-DDoS2019','Trước · UNSW-NB15'],rows,0)+'</div>';
         }
-        case 'units':{
-          const topics=['Thời lượng','Khoảng cách gói','Giao thức','Nhãn'],i=step%4;
-          const examples=[['CIC · micro giây','2.000.000 µs','÷ 1.000.000','2 s','UNSW dur đã tính bằng giây'],['UNSW · mili giây','2.000 ms','÷ 1.000','2 s','CIC IAT dùng µs nên chia 1.000.000'],['CIC / UNSW','6 / tcp','Gom cùng nhóm','TCP','UDP, ICMP và OTHER xử lý tương tự'],['CIC / UNSW','Benign / Normal','Ánh xạ tường minh','BENIGN','Các loại tấn công được gom bằng bảng nhãn']][i];
-          return phases(topics,step)+frame(icon(i<2?'clock':i===2?'data':'select',45,92,135)+tx(285,91,examples[0],'s-label')+tx(285,169,examples[1],'s-number')+edge('M650,150 L810,150',C.blue,true)+tx(730,119,examples[2],'s-axis','text-anchor="middle"')+tx(930,170,examples[3],'s-number s-blue','text-anchor="middle"')+tx(600,290,examples[4],'s-emphasis','text-anchor="middle"'),'Ví dụ chuyển đơn vị và biểu diễn')+note('Ví dụ số minh họa. Chuyển đơn vị không phải chuẩn hóa thống kê z-score.');
+        case 'label-map':{
+          const ds=data.dataset_catalog,lm=data.label_map,col={BENIGN:C.green,DOS_DDOS:C.blue,OTHER_ATTACK:C.purple};
+          const cicCounts={};Object.values(ds.cicddos2019.label_counts).forEach(d=>Object.entries(d).forEach(([k,v])=>{cicCounts[k]=(cicCounts[k]||0)+v;}));
+          const unswCounts={};ds.unsw_nb15.splits.forEach(x=>Object.entries(x.labels).forEach(([k,v])=>{unswCounts[k]=(unswCounts[k]||0)+v;}));
+          const pick=(counts,src,cls)=>Object.entries(counts).filter(([k])=>lm[src][cls].includes(k.toLowerCase().replace(/\s+/g,''))).sort((a,b)=>b[1]-a[1]);
+          const chips=list=>list.length?`<div class="lm-chips">${list.map(([k])=>`<span>${e(k)}</span>`).join('')}</div>`:'<div class="lm-none">không có</div>';
+          const sum=list=>list.reduce((a,[,v])=>a+v,0);
+          const rows=data.classes.map(cls=>{const a=pick(cicCounts,'cicddos2019',cls),b=pick(unswCounts,'unsw_nb15',cls);
+            return `<div class="lm-row" style="--c:${col[cls]}">${chips(a)}<b class="lm-arrow">→</b><div class="lm-class"><strong>${cls}</strong><span>CIC ${n(sum(a))} · UNSW ${n(sum(b))}</span></div><b class="lm-arrow">←</b>${chips(b)}</div>`;}).join('');
+          return `<div class="lm-wrap"><div class="lm-row lm-head"><span>Trước · nhãn gốc CIC-DDoS2019</span><span></span><span>Sau · lớp chung</span><span></span><span>Trước · nhãn gốc UNSW-NB15</span></div>${rows}</div>`;
         }
         case 'quality':{
-          const y=150;
-          let body=icon('data',18,115,80)+edge('M110,150 L240,150',C.blue,true)+rect(260,55,300,220,'#f0f5fd',22)+icon('clean',370,83,65)+lines(410,188,['Kiểm tra giá trị','và nhãn dữ liệu'],'s-scene-title',32,'text-anchor="middle"');
-          [['Hợp lệ','Giữ lại',C.green,70],['Thiếu phép đo','Đánh dấu missing',C.blue,170],['Số gói không hợp lệ','Loại dòng',C.coral,270]].forEach(([title,sub,color,ty],i)=>{
-            const d=`M565,150 C670,150 650,${ty} 785,${ty}`;
-            body+=edge(d,color,true)+pulse(d,color,-i)+circle(815,ty,10,color)+tx(850,ty-3,title,'s-label')+tx(850,ty+26,sub,'s-caption');
-          });
-          return frame(body,'Minh họa quy tắc kiểm tra chất lượng')+`<div class="evidence-line"><span>BÁO CÁO HIỆN TẠI</span><strong>0 dòng bị loại · 0 nhãn lỗi</strong><span>Nhãn lạ/mâu thuẫn → dừng pipeline</span></div>`;
-        }
-        case 'clients':{
-          let body='';
-          data.clients.forEach((c,i)=>{
-            const x=i?890:230,color=i?C.coral:C.blue;
-            body+=circle(x,155,120,i?'#fff1eb':'#edf3fc','class="client-halo"')+icon('server',x-45,103,90,color)+tx(x,34,`CLIENT ${i+1}`,'s-axis','text-anchor="middle"')+tx(x,234,i?'UNSW-NB15':'CIC-DDoS2019','s-scene-title','text-anchor="middle"');
-            body+=lines(x,295,[`Train ${n(c.n_train)}`,`Validation ${n(c.n_val)} · Test ${n(c.n_test)}`],'s-label',30,'text-anchor="middle"');
-          });
-          body+=icon('train',520,92,85,C.green)+tx(563,222,'Mô hình chung','s-label','text-anchor="middle"');
-          ['M362,145L503,145','M756,145L625,145'].forEach((d,i)=>body+=edge(d,i?C.coral:C.blue,true)+pulse(d,i?C.coral:C.blue,-i));
-          return frame(body,'Hai client giữ dữ liệu riêng theo nguồn')+note('Chia theo nguồn, không trộn ngẫu nhiên. Đây là tổ chức logic của mô phỏng.');
+          const act={drop:['Loại dòng','#c34d35'],miss:['Gán missing','#a07322'],keep:['Gom vào OTHER',C.blue],stop:['Dừng pipeline','#17263c']};
+          const c=x=>`<code>${e(x)}</code>`,v=x=>`<span class="qa-val">${e(x)}</span>`;
+          const rows=[
+            [c('fwd_packets / bwd_packets'),v('−3')+v('rỗng')+v('∞'),'drop','Không xác định được flow'],
+            [c('fwd_packets + bwd_packets'),v('0'),'drop','Flow rỗng, không có gói nào'],
+            [c('duration_s'),v('−1')+v('rỗng')+v('∞'),'miss','Giữ dòng, bật cờ duration_missing; không đổi thành 0'],
+            [c('fwd_bytes, bwd_bytes, IAT'),v('âm')+v('∞'),'miss','Một phép đo hỏng, các cột khác vẫn dùng được'],
+            [c('fwd_iat_mean_s'),v('fwd_packets = 1'),'miss','Cần ít nhất 2 gói cùng chiều mới có khoảng cách'],
+            [c('protocol'),v('47 (GRE)')+v('"sctp"'),'keep','Giao thức hiếm gom chung một nhóm'],
+            [c('nhãn'),v('nhãn không có trong bảng'),'stop','Không tự đoán lớp; phải thêm quy tắc rồi chạy lại']
+          ].map(([f,val,a,why])=>[f,val,`<span class="qa-act" style="--a:${act[a][1]}">${act[a][0]}</span>`,`<small class="qa-why">${e(why)}</small>`]);
+          const outcomes=[['Hợp lệ','Giữ nguyên',C.green],['Một phép đo hỏng','Gán missing',act.miss[1]],['Flow không hợp lệ','Loại dòng',act.drop[1]],['Nhãn lạ','Dừng pipeline',act.stop[1]]];
+          const overview=`<div class="qa-overview"><div class="qa-step"><b>Mỗi dòng sau khi chuẩn hóa</b><span>7 số đo · giao thức · nhãn</span></div><i>→</i><div class="qa-step"><b>Kiểm tra từng giá trị</b><span>âm, rỗng, vô hạn, không đủ gói, nhãn lạ</span></div><i>→</i><div class="qa-outs">${outcomes.map(([k,v,col])=>`<span style="--a:${col}"><em>${k}</em>${v}</span>`).join('')}</div></div>`;
+          return `<div class="qa-wrap">${overview}${compareTable(['Trường','Giá trị gặp phải','Xử lý','Lý do'],rows)}</div>`;
         }
         case 'split':{
           let body=icon('data',40,125,88)+tx(85,250,'Mỗi nguồn','s-label','text-anchor="middle"')+edge('M145,165 L280,165',C.blue,true)+circle(310,165,11,C.blue);
@@ -240,7 +244,7 @@
           const field='relevance_'+(state.rankingSource||'pooled'),list=data.feature_ranking.slice(0,6),max=Math.max(...list.map(r=>r[field])),x0=345,pw=650;
           let body='';
           list.forEach((r,i)=>{const y=38+i*46;body+=tx(x0-20,y+15,r.feature,'s-field','text-anchor="end"')+rect(x0,y-9,r[field]/max*pw,30,C.blue,4,`class="grow-bar" style="--order:${i}"`)+tx(x0+r[field]/max*pw+12,y+15,n(r[field],4),'s-label');});
-          return controls(select('rankingSource','Relevance',[['pooled','Gộp train'],['cicddos2019','Riêng CIC'],['unsw_nb15','Riêng UNSW']],state.rankingSource||'pooled'))+frame(body,'Sáu đặc trưng đứng đầu theo thứ hạng pooled',1200,310)+`<div class="decision-examples"><span><b>total_bytes</b> bị loại: r = 0,977 với fwd_bytes</span><span><b>bwd_iat_mean_s</b> bị loại: relevance ≤ 0,001</span></div>`+note('Thứ hạng / quyết định theo pooled. Toàn bộ 17 cột và lý do loại nằm ở phụ lục.');
+          return controls(select('rankingSource','Relevance',[['pooled','Gộp train'],['client_1','Client 1 · CIC'],['client_2','Client 2 · CIC'],['client_3','Client 3 · UNSW'],['client_4','Client 4 · UNSW']],state.rankingSource||'pooled'))+frame(body,'Sáu đặc trưng đứng đầu theo thứ hạng pooled',1200,310)+`<div class="decision-examples"><span><b>total_bytes</b> bị loại: r = 0,977 với fwd_bytes</span><span><b>bwd_iat_mean_s</b> bị loại: relevance ≤ 0,001</span></div>`+note('Thứ hạng / quyết định theo pooled. Toàn bộ 17 cột và lý do loại nằm ở phụ lục.');
         }
         case 'feature-sets':{
           let body='';
@@ -287,19 +291,20 @@
         }
         case 'round':{
           const s=Number(state.step||0)%4,steps=['Gửi mô hình','Học tại client','Gửi cập nhật','Tổng hợp'],y=157;
-          let body=circle(600,y,78,'#e9f0fd')+icon('train',558,y-44,85,C.green)+icon('server',115,y-45,92)+icon('server',990,y-45,92,C.coral);
-          body+=tx(162,291,'CIC · n = 100.000','s-label','text-anchor="middle"')+tx(1036,291,'UNSW · n = 100.000','s-label','text-anchor="middle"')+tx(600,291,steps[s],'s-scene-title','text-anchor="middle"');
-          if(s===0||s===2){const paths=s===0?['M510,157L240,157','M690,157L965,157']:['M240,157L510,157','M965,157L690,157'];paths.forEach((d,i)=>body+=edge(d,i?C.coral:C.blue,true)+pulse(d,i?C.coral:C.blue,-i));}
-          if(s===1){body+=circle(162,y,80,'none','stroke="#2459c4" stroke-width="3" stroke-dasharray="10 8" class="spin-ring"')+circle(1036,y,80,'none','stroke="#c34d35" stroke-width="3" stroke-dasharray="10 8" class="spin-ring"');}
-          if(s===3)body+=tx(600,48,'w mới = 0,5 w₁ + 0,5 w₂','s-formula','text-anchor="middle"');
+          const cx=[[110,80],[260,230],[940,230],[1090,80]];let body=circle(600,y,78,'#e9f0fd')+icon('train',558,y-44,85,C.green);
+          cx.forEach(([x,yy],i)=>body+=icon('server',x-34,yy-34,68,i<2?C.blue:C.coral)+tx(x,yy+52,`Client ${i+1}`,'s-axis','text-anchor="middle"'));
+          body+=tx(185,335,'CIC · mỗi client n = 50.000','s-label','text-anchor="middle"')+tx(1015,335,'UNSW · mỗi client n = 50.000','s-label','text-anchor="middle"')+tx(600,291,steps[s],'s-scene-title','text-anchor="middle"');
+          if(s===0||s===2){const ends=[[150,95],[300,215],[900,215],[1050,95]],hub=[[525,135],[530,185],[670,185],[675,135]];ends.forEach(([x,yy],i)=>{const [hx,hy]=hub[i],d=s===0?`M${hx},${hy}L${x},${yy}`:`M${x},${yy}L${hx},${hy}`;body+=edge(d,i<2?C.blue:C.coral,true)+pulse(d,i<2?C.blue:C.coral,-i*.5);});}
+          if(s===1){cx.forEach(([x,yy],i)=>body+=circle(x,yy,50,'none',`stroke="${i<2?'#2459c4':'#c34d35'}" stroke-width="3" stroke-dasharray="10 8" class="spin-ring"`));}
+          if(s===3)body+=tx(600,48,'w mới = 0,25 (w₁ + w₂ + w₃ + w₄)','s-formula','text-anchor="middle"');
           return `<div class="phase-controls">${steps.map((t,i)=>`<button data-action="step" data-value="${i}" aria-pressed="${s===i}"><span>${i+1}</span>${t}</button>`).join('')}</div><span class="round-step-label">BƯỚC ${s+1} / 4</span>`+frame(body,'Một vòng FedAvg tương tác')+`<div class="criteria-strip"><span><b>30</b> vòng</span><span><b>5</b> epoch / vòng</span><span>Adam · lr <b>0,001</b></span><span>batch <b>64</b> · dropout <b>0,3</b></span></div>`;
         }
         case 'experiments':{
           let body='';
-          [['Local × 2','DAS','150 epoch',C.gray],['Centralized','DAS','150 epoch',C.purple],['FedAvg','ALL / DAS','30 × 5 epoch',C.blue],['FedProx','DAS · μ = 0,1','30 × 5 epoch',C.green]].forEach(([name,input,budget,color],i)=>{
+          [['Local × 4','DAS','150 epoch / client',C.gray],['Centralized','DAS','150 epoch',C.purple],['FedAvg','ALL / DAS','30 × 5 epoch',C.blue],['FedProx','DAS · μ = 0,1','30 × 5 epoch',C.green]].forEach(([name,input,budget,color],i)=>{
             const y=38+i*73;body+=circle(75,y+10,7,color)+tx(110,y+18,name,'s-scene-title')+tx(390,y+18,input,'s-label')+edge(`M600,${y+10}L770,${y+10}`,color,true)+tx(820,y+18,budget,'s-label');
           });
-          return frame(body,'Ma trận phương pháp, đầu vào và ngân sách',1200,310)+`<div class="checkpoint-route"><span>Train: học trọng số</span><b>→</b><strong>Validation: chọn best</strong><b>→</b><span>Test: chấm mô hình đã chốt</span></div>`+note('Seed 0. Best FL / centralized theo F1-macro-present trung bình hai validation; local theo validation nguồn riêng.');
+          return frame(body,'Ma trận phương pháp, đầu vào và ngân sách',1200,310)+`<div class="checkpoint-route"><span>Train: học trọng số</span><b>→</b><strong>Validation: chọn best</strong><b>→</b><span>Test: chấm mô hình đã chốt</span></div>`+note('Seed 0. Best FL / centralized theo F1-macro-present trung bình theo nguồn trên validation; local theo validation của chính client.');
         }
         case 'metrics':{
           let body='';
@@ -308,14 +313,14 @@
           });
           return frame(body,'Ba nhiệm vụ đánh giá với quy tắc quyết định khác nhau',1200,340)+`<div class="evidence-line"><strong>Mean = (metric CIC + metric UNSW) / 2</strong><span>Pooled tính lại từ dự đoán gộp</span></div>`+note('Macro-present: CIC có 2 lớp thật, UNSW có 3. FAR lấy mẫu số là BENIGN.');
         }
-        case 'baseline':return comparison(['local_cic','local_unsw','central','das'],metric,source);
+        case 'baseline':return comparison([...LOCALS,'das','central'],metric,source);
         case 'transfer':{
-          const keys=['local_cic','local_unsw','das','central'];let body=tx(550,29,'TEST CIC','s-axis','text-anchor="middle"')+tx(865,29,'TEST UNSW','s-axis','text-anchor="middle"');
+          const keys=[...LOCALS,'das','central'];let body=tx(527,29,'TEST CIC','s-axis','text-anchor="middle"')+tx(842,29,'TEST UNSW','s-axis','text-anchor="middle"');
           keys.forEach((key,i)=>{
-            const y=60+i*72;body+=tx(310,y+37,labels[key],'s-label','text-anchor="end"');
-            data.sources.forEach((s,j)=>{const value=row(key,s)[metric],x=390+j*315;body+=rect(x,y,275,60,`rgba(36,89,196,${.06+(value||0)*.53})`,8)+tx(x+137,y+39,p(value),'s-value','text-anchor="middle"');});
+            const y=50+i*54;body+=tx(360,y+31,labels[key],'s-label','text-anchor="end"');
+            data.sources.forEach((s,j)=>{const value=row(key,s)[metric],x=390+j*315;body+=rect(x,y,275,46,`rgba(36,89,196,${.06+(value||0)*.53})`,8)+tx(x+137,y+32,p(value),'s-value','text-anchor="middle"');});
           });
-          return controls(keyMetrics(metric))+frame(body,'Ma trận đánh giá xuyên nguồn theo mô hình',1200,365)+note('Một mô hình local có thể tốt trên nguồn riêng nhưng giảm mạnh khi chuyển miền.');
+          return controls(keyMetrics(metric))+frame(body,'Ma trận đánh giá xuyên nguồn theo mô hình',1200,385)+note('Một mô hình local có thể tốt trên nguồn riêng nhưng giảm mạnh khi chuyển miền.');
         }
         case 'all-das':{
           let body='';const x0=280,pw=740;
@@ -324,7 +329,7 @@
             const y=86+i*87,a=row('all',s)[metric],b=row('das',s)[metric],delta=(b-a)*100;
             body+=tx(250,y+8,['CIC','UNSW','Trung bình'][i],'s-label','text-anchor="end"')+`<line x1="${x0+a*pw}" y1="${y}" x2="${x0+b*pw}" y2="${y}" stroke="${C.blue}" stroke-width="5" class="draw-curve" pathLength="1"/>`+circle(x0+a*pw,y,10,C.gray)+circle(x0+b*pw,y,12,C.blue)+tx(x0+a*pw,y-20,p(a),'s-axis','text-anchor="middle"')+tx(x0+b*pw,y+35,p(b),'s-value','text-anchor="middle"')+tx(1100,y+8,(delta>0?'+':'')+n(delta,2),'s-label','text-anchor="middle"');
           });
-          return controls(keyMetrics(metric))+`<div class="chart-legend"><span style="--series:${C.gray}">ALL · 23 đầu vào</span><span style="--series:${C.blue}">DAS · 18 đầu vào</span><span>Chênh lệch: điểm phần trăm</span></div>`+frame(body,'Biểu đồ dumbbell ALL so với DAS')+note('Cùng mẫu và ngân sách. Best ALL vòng 24; best DAS vòng 4, chọn riêng bằng validation.');
+          return controls(keyMetrics(metric))+`<div class="chart-legend"><span style="--series:${C.gray}">ALL · 23 đầu vào</span><span style="--series:${C.blue}">DAS · 18 đầu vào</span><span>Chênh lệch: điểm phần trăm</span></div>`+frame(body,'Biểu đồ dumbbell ALL so với DAS')+note(`Cùng mẫu và ngân sách. Best ALL vòng ${row('all').selected_round}; best DAS vòng ${row('das').selected_round}, chọn riêng bằng validation.`);
         }
         case 'das-tradeoff':{
           let body='';
@@ -349,10 +354,11 @@
         case 'errors':return confusion(state);
         case 'contributions':{
           let body='';
-          const vals=['all','das','prox'].map(k=>row(k).f1_macro_present),xs=[160,600,1040];
-          for(let i=0;i<2;i++)body+=edge(`M${xs[i]+50},${270-vals[i]*230}L${xs[i+1]-50},${270-vals[i+1]*230}`,C.blue,true);
-          ['all','das','prox'].forEach((k,i)=>body+=circle(xs[i],270-vals[i]*230,24,i===2?C.green:C.blue)+tx(xs[i],210-vals[i]*230,p(vals[i]),'s-number','text-anchor="middle"')+tx(xs[i],300,labels[k],'s-scene-title','text-anchor="middle"'));
-          return frame(body,'Tiến trình F1-macro trung bình từ ALL đến FedProx',1200,345)+`<div class="contribution-caption"><span><b>Dữ liệu</b>Pipeline hai nguồn có truy vết</span><span><b>Đối chứng</b>Kiểm tra từng lựa chọn</span><span><b>Kết quả</b>Cải thiện F1, còn đánh đổi FAR</span></div>`+note('F1-macro-present trung bình hai nguồn · seed 0. Không suy ra ưu thế tổng quát.');
+          const keys=['das','all','prox','central'],vals=keys.map(k=>row(k).f1_macro_present),xs=[150,450,750,1050];
+          for(let i=0;i<2;i++)body+=edge(`M${xs[i]+40},${270-vals[i]*230}L${xs[i+1]-40},${270-vals[i+1]*230}`,C.blue,true);
+          body+=`<line x1="${xs[2]+40}" y1="${270-vals[2]*230}" x2="${xs[3]-40}" y2="${270-vals[3]*230}" stroke="${C.purple}" stroke-width="3" stroke-dasharray="7 7"/>`;
+          keys.forEach((k,i)=>body+=circle(xs[i],270-vals[i]*230,24,k==='prox'?C.green:k==='central'?C.purple:C.blue)+tx(xs[i],210-vals[i]*230,p(vals[i]),'s-number','text-anchor="middle"')+tx(xs[i],300,labels[k],'s-scene-title','text-anchor="middle"'));
+          return frame(body,'F1-macro trung bình của ba cấu hình FL và mốc centralized',1200,345)+`<div class="contribution-caption"><span><b>Dữ liệu</b>Pipeline hai nguồn, bốn client, có truy vết</span><span><b>Đối chứng</b>Kiểm tra từng lựa chọn</span><span><b>Kết quả</b>FedProx tốt nhất trong FL, còn sau centralized và đổi lấy FAR</span></div>`+note('F1-macro-present trung bình hai nguồn · seed 0. Centralized là mốc tham chiếu (nét đứt), không phải cận trên được bảo đảm.');
         }
         case 'limits':{
           let body='';

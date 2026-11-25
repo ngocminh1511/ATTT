@@ -12,8 +12,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-RUN_AVG = "20261109_161229_a7ff36"
-RUN_PROX = "20261109_193340_f712a4"
+DATA = "data_paper_multi_4c"
+RUN_FL = "20261122_152058_5ec64a"       # FedAvg ALL/DAS, FedProx DAS, 4 local
+RUN_CENTRAL = "20261122_235344_298853"  # Centralized DAS, chạy riêng cùng bundle
+CLIENTS = (1, 2, 3, 4)
+METHODS = {"local_c1", "local_c2", "local_c3", "local_c4", "central", "all", "das", "prox"}
 SOURCES = ["cicddos2019", "unsw_nb15"]
 CLASSES = ["BENIGN", "DOS_DDOS", "OTHER_ATTACK"]
 
@@ -43,10 +46,8 @@ def csv_rows(path):
 
 
 def method_id(name):
-    if name.startswith("Local-only[cic"):
-        return "local_cic"
-    if name.startswith("Local-only[unsw"):
-        return "local_unsw"
+    if name.startswith("Local-only["):
+        return "local_c" + name.split("#", 1)[1].split("]", 1)[0].strip()
     if name.startswith("Centralized"):
         return "central"
     if "FedProx" in name:
@@ -62,8 +63,8 @@ def training_histogram(prep):
         raise RuntimeError("--refresh-data cần pandas: chạy bằng .venv/Scripts/python.exe") from exc
     col = prep["afn"]["columns"].index("duration_s")
     values = []
-    for client in (1, 2):
-        frame = pd.read_parquet(ROOT / f"data_paper_multi/main/multidataset/client_{client}.parquet")
+    for client in CLIENTS:
+        frame = pd.read_parquet(ROOT / f"{DATA}/main/multidataset/client_{client}.parquet")
         group_names = ["tcp", "udp", "icmp", "other"]
         groups = frame[[f"proto_{g}" for g in group_names]].values.argmax(axis=1)
         for z, group, missing in zip(frame.duration_s, groups, frame.duration_missing):
@@ -91,22 +92,23 @@ def collect_snapshot():
         used_files.append(rel)
         return read_json(ROOT / rel)
 
-    das = load("data_paper_multi/main/features.json")
-    all_features = load("data_paper_multi/main_all/features.json")
-    quality = load("data_paper_multi/main/quality_report.json")
-    prep = load("data_paper_multi/main/prep_params.json")
-    manifest = load("data_paper_multi/main/dataset_manifest.json")
-    weights = load("data_paper_multi/main/multidataset/class_weights.json")
+    das = load(f"{DATA}/main/features.json")
+    all_features = load(f"{DATA}/main_all/features.json")
+    quality = load(f"{DATA}/main/quality_report.json")
+    prep = load(f"{DATA}/main/prep_params.json")
+    manifest = load(f"{DATA}/main/dataset_manifest.json")
+    weights = load(f"{DATA}/main/multidataset/class_weights.json")
     dataset_catalog = load("presentation/data/datasets.json")
-    states = [load(f"results_modal_multidataset/{run}/status_snapshot.json") for run in (RUN_AVG, RUN_PROX)]
+    config = load("configs/multidataset.json")
+    states = [load(f"results_modal_multidataset/{run}/status_snapshot.json") for run in (RUN_FL, RUN_CENTRAL)]
     if any(s["state"] != "completed" for s in states):
         raise ValueError("Chỉ dùng run completed")
     if states[0]["bundle_id"] != states[1]["bundle_id"]:
-        raise ValueError("FedAvg/FedProx không cùng bundle")
+        raise ValueError("Run FL và run centralized không cùng bundle")
     if das["hashes"]["split"] != all_features["hashes"]["split"]:
         raise ValueError("ALL/DAS khác subset")
     methods = {}
-    for run, variant in [(RUN_AVG, "das"), (RUN_AVG, "all"), (RUN_PROX, "das")]:
+    for run, variant in [(RUN_FL, "das"), (RUN_FL, "all"), (RUN_CENTRAL, "das")]:
         base = f"results_modal_multidataset/{run}/main/{variant}"
         for file, destination in [("evaluation_by_dataset.csv", "evaluation"), ("per_class.csv", "per_class"),
                                   ("confusion.csv", "confusion"), ("per_original_label.csv", "original_labels")]:
@@ -114,6 +116,10 @@ def collect_snapshot():
             used_files.append(rel)
             for row in csv_rows(ROOT / rel):
                 key = method_id(row["method"])
+                if run == RUN_CENTRAL and key != "central":
+                    continue
+                if run == RUN_FL and key == "central":
+                    raise ValueError("Centralized phải lấy từ RUN_CENTRAL")
                 method = methods.setdefault(key, {"run": run, "variant": variant, "label": row["method"],
                                                   "evaluation": [], "per_class": [], "confusion": [],
                                                   "original_labels": [], "rounds": []})
@@ -121,17 +127,18 @@ def collect_snapshot():
         for file in sorted((ROOT / base / "fl").glob("*_rounds.csv")):
             rel = file.relative_to(ROOT).as_posix()
             used_files.append(rel)
-            key = "prox" if run == RUN_PROX else variant
+            key = "prox" if "fedprox" in file.name else variant
             methods[key]["rounds"] = csv_rows(file)
-    feature_file = "data_paper_multi/main/feature_selection.csv"
+    feature_file = f"{DATA}/main/feature_selection.csv"
     used_files.append(feature_file)
-    # Record the two train inputs used only for the duration histogram.
-    used_files += [f"data_paper_multi/main/multidataset/client_{k}.parquet" for k in (1, 2)]
+    # Record the four train inputs used only for the duration histogram.
+    used_files += [f"{DATA}/main/multidataset/client_{k}.parquet" for k in CLIENTS]
     evidence = [{"path": rel, "sha256": hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()}
                 for rel in used_files]
     snapshot = {"version": 1, "pipeline": das["pipeline"], "bundle_id": states[0]["bundle_id"],
                 "sources": SOURCES, "classes": CLASSES, "features": {"das": das, "all": all_features},
                 "quality": quality, "clients": manifest["clients"], "class_weights": weights,
+                "client_split": config["client_split"],
                 "dataset_catalog": dataset_catalog,
                 "das_config": prep["das"], "afn": prep["afn"], "label_map": prep["label_map"],
                 "feature_ranking": csv_rows(ROOT / feature_file), "methods": methods,
@@ -166,12 +173,14 @@ def validate_snapshot(data):
         raise ValueError("Hai run phải completed và cùng bundle")
     if any(job["state"] != "completed" for run in data["runs"] for job in run["jobs"] if job["profile"] == "main"):
         raise ValueError("Không sử dụng main job chưa completed")
-    if set(data["methods"]) != {"local_cic", "local_unsw", "central", "all", "das", "prox"}:
-        raise ValueError("Cần đủ 6 mô hình đối chứng")
+    if set(data["methods"]) != METHODS:
+        raise ValueError("Cần đủ 8 mô hình đối chứng (4 local, centralized, ALL, DAS, FedProx)")
+    if len(data["clients"]) != 4 or [c["dataset_id"] for c in data["clients"]] != [SOURCES[0]] * 2 + [SOURCES[1]] * 2:
+        raise ValueError("Cần 4 client: 1–2 CIC, 3–4 UNSW")
     if data["features"]["das"]["hashes"]["split"] != data["features"]["all"]["hashes"]["split"]:
         raise ValueError("ALL/DAS phải cùng split")
-    expected = {"all": (0.4804425104354843, 24), "das": (0.5570728655285542, 4),
-                "prox": (0.6920483367469703, 18), "central": (0.6079110395083358, 111)}
+    expected = {"all": (0.5069722512823294, 13), "das": (0.4688692803680538, 25),
+                "prox": (0.5699001899721743, 30), "central": (0.6088535098212331, 1)}
     for key, method in data["methods"].items():
         index = {r["dataset_id"]: r for r in method["evaluation"]}
         if len(index) != 5:
@@ -221,8 +230,8 @@ def validate_snapshot(data):
 
 def validate_content(content):
     slides, stages = content["slides"], content["stages"]
-    if len(stages) != 9 or len(slides) != 39:
-        raise ValueError("Cần 9 giai đoạn, 33 trang chính và 6 phụ lục")
+    if len(stages) != 9 or len(slides) != 37:
+        raise ValueError("Cần 9 giai đoạn, 31 trang chính và 6 phụ lục")
     if len({s["id"] for s in slides}) != len(slides):
         raise ValueError("ID slide bị trùng")
     known = {s["id"] for s in stages} | {"home", "appendix"}
@@ -238,7 +247,7 @@ def script_markdown(content, data):
     lines = ["# Kịch bản thuyết trình — Học liên kết phát hiện tấn công mạng", "",
              "Sinh từ `src/slides.json`; chỉnh nguồn rồi chạy `python presentation/build.py`.", "",
              "Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng → chuẩn hóa → DAS → huấn luyện → kết quả → kết luận.", "",
-             "Các giá trị thực nghiệm: profile main, seed 0; F1 tổng hợp là trung bình đều F1-macro-present hai nguồn, trừ khi ghi khác.", ""]
+             "Các giá trị thực nghiệm: 4 client (CIC → 1, 2; UNSW → 3, 4), profile main, seed 0; F1 tổng hợp là trung bình đều F1-macro-present hai nguồn, trừ khi ghi khác.", ""]
     stage_names = {s["id"]: s["title"] for s in content["stages"]} | {"home": "Pipeline", "appendix": "Phụ lục"}
     for slide in content["slides"]:
         lines += [f"## {slide['number']} · {slide['title']}", "",
@@ -296,4 +305,4 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true", help="Kiểm tra nội dung và dữ liệu, không ghi file")
     args = parser.parse_args()
     count = build(args.refresh_data, args.check)
-    print(f"OK: {count} trang (33 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")
+    print(f"OK: {count} trang (31 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")

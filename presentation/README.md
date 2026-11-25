@@ -2,7 +2,7 @@
 
 Mở **index.html** bằng trình duyệt. File này chứa giao diện, nội dung dành cho người nghe, số liệu và SVG; có thể chép riêng sang máy khác và dùng offline. Không cần server, Node, CDN hay raw dataset để trình chiếu. Kịch bản lời nói chỉ nằm trong **kich_ban.md**.
 
-Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 33 trang chính (00–32) và 6 trang phụ lục (A1–A6).
+Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 31 trang chính (00–30) và 6 trang phụ lục (A1–A6).
 
 Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải thích lớn. Trang đầu có hình minh họa mạng học liên kết và pipeline SVG với các gói cập nhật chuyển động. Toàn bộ slide chính dùng sơ đồ, ví dụ trực quan hoặc biểu đồ; bảng tham chiếu chi tiết nằm ở phụ lục. Hiệu ứng xuất hiện, đường truyền, bộ lọc và đường học dùng CSS/SVG; tự giảm chuyển động theo thiết lập hệ điều hành.
 
@@ -18,7 +18,7 @@ Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải 
 
 Trong phần kết quả có menu riêng. Một số biểu đồ có bộ chọn nguồn, chỉ số, mô hình hoặc cách chuẩn hóa. Màn hình chiếu chỉ chứa nội dung dành cho người nghe, không có nút lời nói hoặc khung hướng dẫn thuyết trình. Toàn bộ kịch bản và ghi chú chỉ nằm trong `kich_ban.md` và file nguồn, không nhúng vào HTML.
 
-Các trang schema, đổi đơn vị và forward có nút chọn từng phần của minh họa. Trang FedAvg có bốn bước mô phỏng. Đường validation hiển thị đủ 30 vòng, có thể kéo thanh vòng để đọc điểm CIC, UNSW và trung bình. Biểu đồ ALL/DAS dùng các điểm nối để thấy mức thay đổi theo nguồn. Hình AI ở trang mở đầu là minh họa khái niệm; số liệu biểu đồ vẫn lấy từ snapshot thật.
+Mỗi slide có tên giai đoạn làm tiêu đề lớn và tiêu đề slide ngắn bên dưới. Chương 1 là một slide hai bộ dữ liệu kèm biểu đồ nhãn; chương 2 dùng bảng gọn Trước → Sau. Trang forward có nút chọn từng phần của minh họa. Trang FedAvg có bốn bước mô phỏng. Đường validation hiển thị đủ 30 vòng, có thể kéo thanh vòng để đọc điểm CIC, UNSW (trung bình hai client cùng nguồn) và trung bình. Biểu đồ ALL/DAS dùng các điểm nối để thấy mức thay đổi theo nguồn. Hình AI ở trang mở đầu là minh họa khái niệm; số liệu biểu đồ vẫn lấy từ snapshot thật.
 
 ## Sửa và lược bỏ nội dung
 
@@ -45,9 +45,9 @@ Giai đoạn 1 gồm tổng quan hai bộ dữ liệu, CIC-DDoS2019 và UNSW-NB1
 .\.venv\Scripts\python.exe presentation/build.py --refresh-data
 ```
 
-Chế độ refresh cần artifact dự án và pandas trong môi trường hiện có. Không train lại, không tải dữ liệu, không mở raw dataset. Histogram duration được tái dựng từ AFN của 200.000 mẫu train đã lưu, có sai số float32; nguồn được ghi trên hình. Snapshot chỉ chứa thống kê, metric và metadata phục vụ trình bày, không chứa bản ghi flow.
+Chế độ refresh cần artifact dự án và pandas trong môi trường hiện có. Không train lại, không tải dữ liệu, không mở raw dataset. Histogram duration được tái dựng từ AFN của 200.000 mẫu train đã lưu (`client_1..4.parquet`), có sai số float32; nguồn được ghi trên hình. Snapshot chỉ chứa thống kê, metric và metadata phục vụ trình bày, không chứa bản ghi flow.
 
-Hai run cố định: `20261109_161229_a7ff36` (đối chứng) và `20261109_193340_f712a4` (FedProx), profile main, seed 0, cùng bundle. Nếu kết quả hoặc best checkpoint thay đổi, bộ kiểm tra dừng để yêu cầu rà lại diễn giải. Khi chủ động dùng thí nghiệm mới, cập nhật nguồn, mốc kiểm tra và lời nhận xét cùng lúc.
+Dữ liệu chuẩn bị: `data_paper_multi_4c`. Hai run cố định, profile main, seed 0, cùng bundle `1298b6c2…`: `20261122_152058_5ec64a` (FedAvg ALL/DAS, FedProx DAS, 4 local) và `20261122_235344_298853` (centralized DAS, chạy riêng). Tổng cộng 8 mô hình. Nếu kết quả hoặc best checkpoint thay đổi, bộ kiểm tra dừng để yêu cầu rà lại diễn giải. Khi chủ động dùng thí nghiệm mới, cập nhật nguồn, mốc kiểm tra và lời nhận xét cùng lúc.
 
 Sơ đồ minh họa không phải dữ liệu đo được luôn có nhãn ví dụ. Các bảng phân biệt F1-macro-present trung bình nguồn, pooled, mọi tấn công và riêng DoS/DDoS. Lớp vắng được ghi N/A. Không dùng thời gian trên GPU khác nhau để kết luận về tốc độ.
 
@@ -65,9 +65,9 @@ Không thay đổi mã chuẩn bị dữ liệu hoặc huấn luyện của dự
 
 ## Trang demo hai node (`demo.html`)
 
-Trang riêng, không nằm trong chuỗi slide: `http://127.0.0.1:5500/presentation/demo.html` (Live Server) hoặc mở trực tiếp file. Hàng đợi gồm 30 flow thật trong tập test (15 CIC, 15 UNSW, khoảng 1/4 là ca mô hình đoán sai); kéo thả hoặc ▲▼ để sắp thứ tự. **Bắn 1 flow / Bắn hết**: flow bay sang node của nguồn dữ liệu (A = CIC, B = UNSW) và rơi vào stack của node, kèm lớp dự đoán, xác suất và đúng/sai. Đổi mô hình FedProx / FedAvg ở góc trên.
+Trang riêng, không nằm trong chuỗi slide: `http://127.0.0.1:5500/presentation/demo.html` (Live Server) hoặc mở trực tiếp file. Hàng đợi gồm 30 flow thật trong tập test (15 CIC, 15 UNSW, khoảng 1/4 là ca mô hình đoán sai); kéo thả hoặc ▲▼ để sắp thứ tự. **Bắn 1 flow / Bắn hết**: flow bay sang node của nguồn dữ liệu (A = CIC · client 1–2, B = UNSW · client 3–4; test giữ theo nguồn nên node theo nguồn) và rơi vào stack của node, kèm lớp dự đoán, xác suất và đúng/sai. Đổi mô hình FedProx / FedAvg ở góc trên.
 
-Xác suất được tính sẵn từ best checkpoint, trang không chạy mô hình. Dữ liệu: `data/demo.json`; giao diện: `src/demo.html`.
+Xác suất được tính sẵn từ best checkpoint FedProx / FedAvg DAS của run 4 client, trang không chạy mô hình. Dữ liệu: `data/demo.json`; giao diện: `src/demo.html`.
 
 ```powershell
 .\.venv\Scripts\python.exe presentation/make_demo.py               # lấy lại 30 flow + xác suất (cần torch, raw data)

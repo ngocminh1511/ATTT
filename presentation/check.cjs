@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('39 pages, 9 stages, 6 appendices',()=>{
-  assert.equal(deck.slides.length,39);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[3,3,3,2,2,3,5,9,2]);
+check('37 pages, 9 stages, 6 appendices',()=>{
+  assert.equal(deck.slides.length,37);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,3,2,2,3,5,9,2]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -25,7 +25,7 @@ check('all audience pages render without presenter instructions',()=>{
     assert.ok(!/ĐIỂM CẦN TRÌNH BÀY|SAU BƯỚC NÀY|source-mini|takeaway|speaker-notes/.test(html),slide.id);
     if(slide.stage!=='appendix'){
       assert.ok(!html.includes('fl_ddos/'),slide.id);
-      assert.ok(!html.includes('<table'),`${slide.id}: main deck must explain with visuals, not reference tables`);
+      if(!['data','clean'].includes(slide.stage))assert.ok(!html.includes('<table'),`${slide.id}: main deck must explain with visuals, not reference tables`);
     }
     assert.ok(deck.renderMenu(slide.id).includes('aria-current="page"'));
   }
@@ -41,12 +41,18 @@ check('source and metric combinations do not lose values',()=>{
   for(const method of Object.keys(data.methods))for(const testSource of data.sources)for(const matrixMode of ['percent','count']) {
     assert.ok(!/NaN|undefined/.test(deck.render('appendix-confusion',{method,testSource,matrixMode})));
   }
-  for(const curve of ['das','all','prox'])assert.ok(deck.render('results-heterogeneity',{curve}).includes(`Best vòng ${{das:4,all:24,prox:18}[curve]}`));
-  for(const rankingSource of ['pooled','cicddos2019','unsw_nb15'])assert.ok(!/NaN/.test(deck.render('select-ranking',{rankingSource})));
-  const overview=deck.render('data-problem'),cic=deck.render('data-sources'),unsw=deck.render('data-labels');
-  assert.ok(overview.includes('431.371')&&overview.includes('257.673')&&overview.includes('100.000 flow'));
-  assert.ok(cic.includes('12/01/2019')&&cic.includes('11/03/2019')&&cic.includes('Portmap')&&cic.includes('SSDP'));
-  assert.ok(unsw.includes('2.540.044')&&unsw.includes('175.341')&&unsw.includes('82.332')&&unsw.includes('45 cột'));
+  for(const curve of ['das','all','prox'])assert.ok(deck.render('results-heterogeneity',{curve}).includes(`Best vòng ${{das:25,all:13,prox:30}[curve]}`));
+  assert.ok(deck.render('split-clients').includes('CLIENT 4')&&deck.render('train-round',{step:3}).includes('0,25'));
+  for(const id of ['local_c1','local_c2','local_c3','local_c4'])assert.ok(deck.render('results-baseline').includes(id==='local_c1'?'CIC #1':id==='local_c2'?'CIC #2':id==='local_c3'?'UNSW #3':'UNSW #4'));
+  const prox=data.methods.prox.rounds.at(-1);assert.ok(deck.render('results-heterogeneity',{curve:'prox',round:30}).includes(pct(prox.val_f1mp_unsw_nb15)));
+  for(const rankingSource of ['pooled','client_1','client_2','client_3','client_4']){assert.ok(!/NaN/.test(deck.render('select-ranking',{rankingSource})));assert.ok(!/NaN/.test(deck.render('appendix-ranking',{rankingSource})));}
+  const overview=deck.render('data-problem'),cic=overview,unsw=overview;
+  assert.ok(overview.includes('431.371')&&overview.includes('257.673')&&overview.includes('121.368')&&overview.includes('93.000'));
+  assert.ok(cic.includes('12/01/2019')&&cic.includes('11/03/2019')&&cic.includes('Portmap')&&!cic.includes('SSDP'));
+  assert.ok(unsw.includes('175.341')&&unsw.includes('82.332')&&overview.includes('<b>45</b>'));
+  const schema=deck.render('clean-schema'),quality=deck.render('clean-labels')+deck.render('clean-quality');
+  for(const col of ['Flow Duration','dur','sinpkt / dinpkt','µs ÷ 10⁶','ms ÷ 10³','protocol_group'])assert.ok(schema.includes(col),col);
+  for(const cls of data.classes)assert.ok(quality.includes(cls),cls);assert.ok(quality.includes('Loại dòng')&&quality.includes('Gán missing')&&quality.includes('Dừng pipeline'));
   for(const attack of data.dataset_catalog.unsw_nb15.attacks)assert.ok(unsw.includes(attack));
   for(const example of ['normal','zero','no-bwd'])assert.ok(!/NaN|Infinity/.test(deck.render('features-example',{example})));
 });
@@ -63,7 +69,7 @@ check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
   changed.slides.forEach(s=>{if(s.id==='results-prox'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,36);assert.equal(d.groups.length,8);
+  assert.equal(d.slides.length,34);assert.equal(d.groups.length,8);
   assert.equal(d.neighbor('results-prox-mechanism',1),'results-errors');
   assert.equal(d.neighbor('features-example',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
@@ -133,7 +139,7 @@ check('mounted next/back/hash, selectors, menu, keyboard and loop step',()=>{
   location.hash='#results-prox';
   elements.main.handlers.change({target:{dataset:{control:'metric'},value:'attack_far_benign'}});
   assert.ok(elements.main.innerHTML.includes('FAR mọi tấn công ↓'));
-  assert.ok(elements.main.innerHTML.includes('30,64%'));
+  assert.ok(elements.main.innerHTML.includes('16,96%'));
   elements['menu-toggle'].handlers.click();location.hash='#results-errors';
   assert.ok(elements['slide-menu'].innerHTML.includes('Nhìn vào lỗi'));
   key('Escape');location.hash='#train-round';

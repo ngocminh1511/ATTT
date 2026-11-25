@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Demo hai node</title>
+<title>Demo hai nguồn · 4 client</title>
 <style>
 :root{--paper:#fff;--canvas:#f5f7fb;--ink:#17263c;--muted:#56677e;--line:#d9e1eb;--blue:#2459c4;--coral:#c34d35;--green:#16704e;--purple:#7254ad;--ok:#16704e;--bad:#c0392b;
   --c0:#16704e;--c1:#c34d35;--c2:#7254ad;font-family:Arial,"Segoe UI",sans-serif;font-size:16px;color:var(--ink);background:var(--paper)}
@@ -68,7 +68,7 @@ footer{padding:0 24px 18px;font-size:12px;color:var(--muted);max-width:1500px;ma
 </head>
 <body>
 <header>
-  <h1>Demo · Flow đi vào hai node<small>Mỗi flow đến đúng node của nguồn dữ liệu, mô hình tại node phân loại rồi xếp kết quả vào stack.</small></h1>
+  <h1>Demo · Flow đi vào hai node<small>Mỗi flow đến node của nguồn dữ liệu (CIC: client 1–2, UNSW: client 3–4); mô hình toàn cục 4 client phân loại rồi xếp kết quả vào stack.</small></h1>
   <span class="spacer"></span>
   <label class="sel">MÔ HÌNH TẠI NODE<select id="model"><option value="prox">FedProx · DAS</option><option value="das">FedAvg · DAS</option></select></label>
   <a href="index.html#pipeline">← Bài trình chiếu</a>
@@ -88,15 +88,15 @@ footer{padding:0 24px 18px;font-size:12px;color:var(--muted);max-width:1500px;ma
     <ol class="items" id="queue"></ol>
   </section>
   <section class="arena" aria-label="Hai node">
-    <div class="panel router"><span>Hàng đợi</span><b>→</b><span>chuyển theo nguồn dữ liệu của flow</span><b>→</b><span><b>Node A</b> (CIC) / <b>Node B</b> (UNSW)</span></div>
+    <div class="panel router"><span>Hàng đợi</span><b>→</b><span>chuyển theo nguồn dữ liệu của flow</span><b>→</b><span><b>Node A</b> (CIC · client 1–2) / <b>Node B</b> (UNSW · client 3–4)</span></div>
     <div class="nodes">
       <div class="panel node a" id="node-cicddos2019">
-        <div class="node-head"><h2>NODE A · CIC-DDoS2019</h2><p class="model-line"></p>
+        <div class="node-head"><h2>NODE A · CIC-DDoS2019 · CLIENT 1–2</h2><p class="model-line"></p>
           <div class="stats"><span>Đã nhận<b class="n">0</b></span><span class="ok">Đúng<b class="okn">0</b></span><span class="bad">Sai<b class="badn">0</b></span></div></div>
         <div class="inlet"></div><div class="stack"><div class="hint">Stack trống</div></div>
       </div>
       <div class="panel node b" id="node-unsw_nb15">
-        <div class="node-head"><h2>NODE B · UNSW-NB15</h2><p class="model-line"></p>
+        <div class="node-head"><h2>NODE B · UNSW-NB15 · CLIENT 3–4</h2><p class="model-line"></p>
           <div class="stats"><span>Đã nhận<b class="n">0</b></span><span class="ok">Đúng<b class="okn">0</b></span><span class="bad">Sai<b class="badn">0</b></span></div></div>
         <div class="inlet"></div><div class="stack"><div class="hint">Stack trống</div></div>
       </div>

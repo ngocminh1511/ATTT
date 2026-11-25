@@ -4,8 +4,8 @@
   python presentation/make_demo.py --html-only                       # chỉ dựng lại demo.html sau khi sửa src/demo.html
 
 Mỗi flow được đọc lại từ file raw theo row_id, qua adapter -> 17 cột liên tục -> log1p -> AFN -> DAS,
-rồi so khớp với vector đã lưu trong data_paper_multi/main/test (sai khác > 1e-4 thì dừng). Xác suất lấy
-từ best checkpoint FedProx (μ = 0,1) và FedAvg DAS. Không huấn luyện lại, không ghi IP/cổng/timestamp.
+rồi so khớp với vector đã lưu trong data_paper_multi_4c/main/test (sai khác > 1e-4 thì dừng). Xác suất lấy
+từ best checkpoint FedProx (μ = 0,1) và FedAvg DAS của run 4 client. Không huấn luyện lại, không ghi IP/cổng/timestamp.
 """
 from __future__ import annotations
 
@@ -27,11 +27,11 @@ from fl_ddos import paths  # noqa: E402
 from fl_ddos.multidataset_eval import load_checkpoint  # noqa: E402
 from fl_ddos.task import _meta_at  # noqa: E402
 
-DATA = ROOT / "data_paper_multi/main"
+DATA = ROOT / "data_paper_multi_4c/main"
+RUN = ROOT / "results_modal_multidataset/20261122_152058_5ec64a/main/das/fl"  # 4 client
 CHECKPOINTS = {
-    "prox": ROOT / "results_modal_multidataset/20261109_193340_f712a4/main/das/fl/"
-                   "multidataset_resvgg_swin_seed0_fedprox_mu0.1_best.pt",
-    "das": ROOT / "results_modal_multidataset/20261109_161229_a7ff36/main/das/fl/multidataset_resvgg_swin_seed0_best.pt",
+    "prox": RUN / "multidataset_resvgg_swin_seed0_fedprox_mu0.1_best.pt",
+    "das": RUN / "multidataset_resvgg_swin_seed0_best.pt",
 }
 PER_SOURCE = 15     # mỗi node 15 flow, chia đều theo lớp thật của nguồn
 WRONG_SHARE = 0.25  # khoảng 1/4 là ca FedProx đoán sai, để demo thấy cả lỗi
