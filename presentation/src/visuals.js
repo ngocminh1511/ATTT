@@ -50,20 +50,71 @@
     const {data,content,groups,byId,row,assets={}}=ctx;
     const phase=state=>Number(state.phase||0);
     const stat=(value,label,detail='')=>`<div class="editorial-stat"><strong>${e(value)}</strong><span>${e(label)}</span>${detail?`<small>${e(detail)}</small>`:''}</div>`;
+    function heroNetwork(){
+      const R='repeatCount="indefinite"',SX=1235,SY=450,G='#5ee2a0';
+      const clients=[[990,262,'#6aa8ff','Client 1 · CIC'],[985,640,'#6aa8ff','Client 2 · CIC'],[1490,262,'#ff8a6a','Client 3 · UNSW'],[1500,640,'#ff8a6a','Client 4 · UNSW']];
+      const deco=[[120,170],[260,330],[90,560],[330,700],[520,150],[600,420],[470,600],[700,260],[760,760],[1020,130],[1300,110],[1560,420],[1320,780],[1040,800],[640,880],[200,820],[1580,140],[1590,760]];
+      let b=`<defs>
+        <radialGradient id="h-core" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#7ef0b8"/><stop offset="1" stop-color="#1c8f5c"/></radialGradient>
+        <radialGradient id="h-halo"><stop offset="0" stop-color="#3fd39a" stop-opacity=".45"/><stop offset="1" stop-color="#3fd39a" stop-opacity="0"/></radialGradient>
+        <filter id="h-glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="5"/></filter>
+        <pattern id="h-dots" width="34" height="34" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="#ffffff" opacity=".07"/></pattern>
+        <linearGradient id="h-fade" x1="0" x2="1"><stop offset="0" stop-color="#0a1830" stop-opacity=".92"/><stop offset=".42" stop-color="#0a1830" stop-opacity=".55"/><stop offset=".62" stop-color="#0a1830" stop-opacity="0"/></linearGradient>
+      </defs><rect width="1600" height="900" fill="url(#h-dots)"/>`;
+      // decorative mesh
+      deco.forEach(([x,y],k)=>{const [nx,ny]=deco[(k+3)%deco.length];b+=`<line x1="${x}" y1="${y}" x2="${nx}" y2="${ny}" stroke="#7fa7e8" stroke-opacity=".10" stroke-width="1"/>`;});
+      deco.forEach(([x,y],k)=>{b+=`<circle cx="${x}" cy="${y}" r="${3+k%3}" fill="#9cc0ff" opacity=".35"><animate attributeName="opacity" values=".15;.55;.15" dur="${3+k%4}s" begin="${-k*0.7}s" ${R}/></circle>`;});
+      // links + particles
+      clients.forEach(([x,y,col],k)=>{
+        const mx=(SX+x)/2+(k<2?-40:40),my=(SY+y)/2+(y<SY?-60:60),d=`M${SX},${SY} Q${mx},${my} ${x},${y}`,du=`M${x},${y} Q${mx},${my} ${SX},${SY}`;
+        b+=`<path d="${d}" fill="none" stroke="#ffffff" stroke-opacity=".16" stroke-width="2"/>`;
+        b+=`<path d="${d}" fill="none" stroke="${col}" stroke-opacity=".5" stroke-width="2" stroke-dasharray="3 14"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.4s" ${R}/></path>`;
+        for(let q=0;q<3;q++){
+          b+=`<g><circle r="11" fill="${G}" opacity=".55" filter="url(#h-glow)"/><circle r="5" fill="#eafff4"/><animateMotion dur="2.8s" begin="${-q*0.93-k*0.2}s" ${R} path="${d}" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.3 1"/></g>`;
+          b+=`<g><circle r="11" fill="${col}" opacity=".6" filter="url(#h-glow)"/><circle r="5" fill="#ffffff"/><animateMotion dur="2.8s" begin="${-q*0.93-k*0.2-0.46}s" ${R} path="${du}" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.3 1"/></g>`;
+        }
+      });
+      // server
+      b+=`<circle cx="${SX}" cy="${SY}" r="230" fill="url(#h-halo)"/>`;
+      for(let q=0;q<2;q++)b+=`<circle cx="${SX}" cy="${SY}" r="70" fill="none" stroke="${G}" stroke-width="2"><animate attributeName="r" values="70;260" dur="4s" begin="${-q*2}s" ${R}/><animate attributeName="opacity" values=".55;0" dur="4s" begin="${-q*2}s" ${R}/></circle>`;
+      b+=`<g><circle cx="${SX}" cy="${SY}" r="118" fill="none" stroke="#9fe9c6" stroke-opacity=".45" stroke-width="1.5" stroke-dasharray="2 10"/><circle cx="${SX+118}" cy="${SY}" r="5" fill="#9fe9c6"/><animateTransform attributeName="transform" type="rotate" from="0 ${SX} ${SY}" to="360 ${SX} ${SY}" dur="18s" ${R}/></g>`;
+      b+=`<g><circle cx="${SX}" cy="${SY}" r="150" fill="none" stroke="#7fa7e8" stroke-opacity=".3" stroke-width="1.2" stroke-dasharray="14 10"/><circle cx="${SX}" cy="${SY-150}" r="4" fill="#cfe0ff"/><animateTransform attributeName="transform" type="rotate" from="360 ${SX} ${SY}" to="0 ${SX} ${SY}" dur="26s" ${R}/></g>`;
+      b+=`<circle cx="${SX}" cy="${SY}" r="72" fill="url(#h-core)" stroke="#c9ffe4" stroke-width="2.5"/>`+icon('train',SX-34,SY-38,68,'#ffffff');
+      b+=`<text x="${SX}" y="${SY+108}" text-anchor="middle" class="h-label strong">Mô hình toàn cục</text><text x="${SX}" y="${SY+132}" text-anchor="middle" class="h-label">FedAvg / FedProx</text>`;
+      // clients
+      clients.forEach(([x,y,col,name])=>{
+        b+=`<circle cx="${x}" cy="${y}" r="58" fill="${col}" opacity=".12"><animate attributeName="r" values="46;62;46" dur="3.2s" ${R}/></circle>`;
+        b+=`<circle cx="${x}" cy="${y}" r="40" fill="#10264a" stroke="${col}" stroke-width="2.5"/>`+icon('server',x-20,y-20,40,col);
+        const ly=y<SY?y-62:y+76;
+        b+=`<rect x="${x-82}" y="${ly-22}" width="164" height="32" rx="16" fill="#0d2142" stroke="${col}" stroke-opacity=".6"/><text x="${x}" y="${ly}" text-anchor="middle" class="h-label strong">${e(name)}</text>`;
+      });
+      b+=`<rect width="1600" height="900" fill="url(#h-fade)"/>`;
+      return `<svg class="hero-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">${b}</svg>`;
+    }
     function home(){
+      const logo=assets.logo?`<img src="${assets.logo}" alt="Logo Trường Đại học Bách khoa – Đại học Đà Nẵng" width="88" height="88">`:'';
+      return `<section class="hero">${heroNetwork()}<div class="hero-content">
+        <div class="ts-school">${logo}<div><b>ĐẠI HỌC ĐÀ NẴNG</b><span>TRƯỜNG ĐẠI HỌC BÁCH KHOA</span><small>KHOA CÔNG NGHỆ THÔNG TIN</small></div></div>
+        <h1>Học liên kết<br><em>phát hiện tấn công mạng</em></h1>
+        <p class="ts-sub">trên hai nguồn dữ liệu CIC-DDoS2019 và UNSW-NB15</p>
+        <dl class="ts-people"><div><dt>Giảng viên hướng dẫn</dt><dd>PGS.TS Nguyễn Tấn Khôi</dd></div><div><dt>Sinh viên thực hiện</dt><dd>Phan Văn Hiếu<span>MSSV 102230120</span></dd><dd>Đoàn Ngọc Minh<span>MSSV 102230157</span></dd></div></dl>
+        <span class="hero-date">Đà Nẵng, 11/2026</span>
+      </div></section>`;
+    }
+    function roadmap(){
       const positions=[[80,50],[340,50],[600,50],[860,50],[1120,50],[1120,210],[773,210],[427,210],[80,210]];
       const names=[['Tổng quan','dữ liệu'],['Làm sạch','& đồng nhất'],['Phân chia','dữ liệu'],['Xây dựng','đặc trưng'],['Chuẩn hóa','dữ liệu'],['Lựa chọn','đặc trưng'],['Kiến trúc','& huấn luyện'],['Đánh giá','kết quả'],['Kết luận','& hướng đi']];
       let body='';
       for(let i=0;i<8;i++){
         const [x,y]=positions[i],[nx,ny]=positions[i+1];
         const d=i===4?`M${x},${y+40} C${x+80},${y+70} ${nx+80},${ny-70} ${nx},${ny-40}`:i<4?`M${x+48},${y} L${nx-48},${ny}`:`M${x-48},${y} L${nx+48},${ny}`;
-        body+=edge(d,'#b6c8e0',true)+pulse(d,i<5?C.blue:C.coral,-i*.7);
+        body+=edge(d,'#b6c8e0',true);
       }
       groups.forEach(g=>{
         const i=content.stages.findIndex(s=>s.id===g.id),[x,y]=positions[i],kind=['data','clean','split','features','normalize','select','train','results','conclusion'][i];
         body+=`<a href="#${g.slides[0].id}" class="pipeline-stop" style="--order:${i}" aria-label="${e(g.title)}">${circle(x,y,39,i===7?'#e2efff':'#f1f5fb','class="stop-disc"')}${icon(kind,x-22,y-22,44,i===7?C.coral:C.blue)}${tx(x-54,y-35,String(i+1).padStart(2,'0'),'s-stage-index')}${lines(x,y+63,names[i],'s-pipeline-title',24,'text-anchor="middle"')}</a>`;
       });
-      return `<section class="cover"><div class="cover-copy"><p class="eyebrow">ĐỒ ÁN AN TOÀN THÔNG TIN</p><h1>Học liên kết.<br><em>Phát hiện tấn công mạng.</em></h1><p>Hai nguồn dữ liệu, bốn client. Một mô hình chung.<br>Từ phép đo lưu lượng đến bằng chứng thực nghiệm.</p><div class="cover-facts"><span>CIC-DDoS2019</span><b>+</b><span>UNSW-NB15</span><i>4 client / 3 lớp</i></div></div><div class="cover-art">${assets.network?`<img src="${assets.network}" alt="Minh họa hai mạng cục bộ trao đổi cập nhật với mô hình toàn cục" width="1672" height="941">`:''}<svg viewBox="0 0 800 380" aria-hidden="true"><path d="M120 260Q400 80 680 260"/><circle r="6"><animateMotion dur="4s" repeatCount="indefinite" path="M120 260Q400 80 680 260"/></circle><circle r="5"><animateMotion dur="4s" begin="-2s" repeatCount="indefinite" path="M680 260Q400 80 120 260"/></circle></svg><span class="art-caption">MINH HỌA HỌC LIÊN KẾT</span></div></section><section class="pipeline-map"><div class="pipeline-heading"><span>QUY TRÌNH THỰC HIỆN</span><span>Chọn một giai đoạn để bắt đầu ↘</span></div>${frame(body,'Pipeline chín giai đoạn có đường truyền dữ liệu chuyển động',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span><a href="#${groups[0]?.slides[0].id||'pipeline'}">Bắt đầu trình bày →</a></div>`;
+      return `<section class="roadmap"><header class="roadmap-head"><h1>Quy trình thực hiện</h1><span>9 giai đoạn</span></header><section class="pipeline-map">${frame(body,'Pipeline chín giai đoạn',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span></div></section>`;
     }
 
     function bars(keys,metric,source){
@@ -121,6 +172,7 @@
       const step=phase(state),source=state.source||'mean_over_sources',metric=state.metric||'f1_macro_present';
       switch(slide.view){
         case 'home':return home();
+        case 'roadmap':return roadmap();
         case 'dataset-overview':{
           const ds=data.dataset_catalog,lm=data.label_map;
           const classColor={BENIGN:C.green,DOS_DDOS:C.blue,OTHER_ATTACK:C.purple};
@@ -279,29 +331,45 @@
           return `<div class="nz-grid">${left}${right}</div>${table}<div class="nz-rules"><span class="train-lock">μ, σ chỉ học từ train</span><span>Validation / test áp lại, không học lại</span><span>σ ≈ 0 → dùng 1</span><span>Nhóm không có mẫu → dùng μ, σ chung</span><span>Missing → z = 0</span></div>`;
         }
         case 'das':{
-          let body='';
-          for(let i=0;i<17;i++)body+=rect(45+i*19,90,12,82,i<12?C.blue:C.gray,3,`class="grow-up" style="--order:${i*.15}"`);
-          body+=tx(195,48,'17 cột liên tục','s-scene-title','text-anchor="middle"')+edge('M385,130L500,130',C.blue,true)+icon('select',535,70,110)+tx(590,218,'CRA + IDF','s-scene-title','text-anchor="middle"')+edge('M680,130L810,130',C.blue,true);
-          for(let i=0;i<12;i++)body+=rect(845+i*22,90,14,82,C.blue,3,'class="grow-up"');
-          body+=tx(970,48,'12 cột được giữ','s-scene-title','text-anchor="middle"');
-          body+=edge('M180,230C180,300 950,300 970,230',C.purple,true)+tx(600,320,'6 cột cố định đi theo nhánh riêng','s-label','text-anchor="middle"');
-          return frame(body,'Lọc đặc trưng liên tục, giữ sáu cột cố định')+`<div class="criteria-strip"><span>Relevance &gt; <b>0,001</b></span><span>|r| &lt; <b>0,9</b></span><span>Tối đa <b>12</b> cột liên tục</span></div>`;
+          const d=data.das_config,f=x=>n(x,x<0.01?3:1);
+          return `<div class="th-wrap"><div class="th-grid">
+            <section class="th-card"><header><b>1</b><span>CRA <em>(Conditional Relevance Assessor)</em><small>Đánh giá mức liên quan với nhãn</small></span></header>
+              <div class="th-formula">relevance(x) = <sup>1</sup>⁄<sub>|C|</sub> · Σ<sub>c</sub> ρ(x, 1[y = c])²</div>
+              <div class="th-formula sm">ρ(a, b) = Cov(a, b) / √(Var a · Var b)</div>
+              <ul><li><code>1[y = c]</code> = 1 nếu flow thuộc lớp c, ngược lại 0</li><li>Trung bình trên các lớp có mặt: BENIGN, DOS_DDOS, OTHER_ATTACK</li><li>Điểm càng cao → đặc trưng càng giúp phân biệt các lớp</li></ul></section>
+            <section class="th-card"><header><b>2</b><span>IDF <em>(Iterative Dependency Filter)</em><small>Lọc lặp các cột phụ thuộc nhau</small></span></header>
+              <ol class="th-steps"><li>Sắp 17 cột theo relevance giảm dần</li><li>Bỏ nếu relevance ≤ θ = <b>${f(d.theta)}</b> (gần như không liên quan)</li><li>Bỏ nếu |ρ| ≥ γ = <b>${f(d.gamma)}</b> với một cột đã giữ (trùng thông tin)</li><li>Giữ tối đa K = <b>${d.max_continuous}</b> cột</li></ol></section></div>
+            <div class="th-flow"><span>17 cột liên tục<small>train · sau log1p + AFN · gộp 4 client</small></span><i>→</i><span class="a">CRA<small>xếp hạng</small></span><i>→</i><span class="a">IDF<small>lọc theo thứ tự</small></span><i>→</i><span class="k">12 cột giữ<small>+ 6 cột cố định không qua DAS</small></span></div></div>`;
         }
         case 'ranking':{
-          const field='relevance_'+(state.rankingSource||'pooled'),list=data.feature_ranking.slice(0,6),max=Math.max(...list.map(r=>r[field])),x0=345,pw=650;
+          const rows=data.feature_ranking,max=Math.max(...rows.map(r=>r.relevance_pooled));
+          const kind=r=>r.status==='selected'?['keep','Giữ']:String(r.reason).startsWith('redundant_with')?['red',`Trùng với ${String(r.reason).split(':')[1].split('(')[0]} · |ρ| = ${n(Number(String(r.reason).split('|r|=')[1].replace(')','')),3)}`]:['low','Relevance ≤ θ'];
+          return `<div class="rk-wrap"><div class="rk-legend"><span class="keep">Giữ</span><span class="red">Loại · trùng thông tin</span><span class="low">Loại · ít liên quan</span></div><div class="rk-rows">${rows.map(r=>{const [k,t]=kind(r);return `<div class="rk-row ${k}"><em>${r.rank}</em><code>${e(r.feature)}</code><div><i style="width:max(3px,${r.relevance_pooled/max*100}%)"></i></div><b>${n(r.relevance_pooled,4)}</b><span>${e(t)}</span></div>`;}).join('')}</div></div>`;
+        }
+        case 'das-corr':{
+          const {features,corr}=data.das_corr,N=features.length,cs=34,L=250,T=34,rk=Object.fromEntries(data.feature_ranking.map(r=>[r.feature,r]));
+          const pairs=data.feature_ranking.filter(r=>String(r.reason).startsWith('redundant_with')).map(r=>[r.feature,String(r.reason).split(':')[1].split('(')[0]]);
+          const hit=new Set(pairs.flatMap(([a,b])=>[`${a}|${b}`,`${b}|${a}`]));
           let body='';
-          list.forEach((r,i)=>{const y=38+i*46;body+=tx(x0-20,y+15,r.feature,'s-field','text-anchor="end"')+rect(x0,y-9,r[field]/max*pw,30,C.blue,4,`class="grow-bar" style="--order:${i}"`)+tx(x0+r[field]/max*pw+12,y+15,n(r[field],4),'s-label');});
-          return controls(select('rankingSource','Relevance',[['pooled','Gộp train'],['client_1','Client 1 · CIC'],['client_2','Client 2 · CIC'],['client_3','Client 3 · UNSW'],['client_4','Client 4 · UNSW']],state.rankingSource||'pooled'))+frame(body,'Sáu đặc trưng đứng đầu theo thứ hạng pooled',1200,310)+`<div class="decision-examples"><span><b>total_bytes</b> bị loại: r = 0,977 với fwd_bytes</span><span><b>bwd_iat_mean_s</b> bị loại: relevance ≤ 0,001</span></div>`+note('Thứ hạng / quyết định theo pooled. Toàn bộ 17 cột và lý do loại nằm ở phụ lục.');
+          features.forEach((f,i)=>{const col=rk[f].status==='selected'?'#17263c':'#c34d35';
+            body+=`<text x="${L-10}" y="${T+i*cs+cs*0.66}" text-anchor="end" class="hm-label" style="fill:${col}">${e(f)} <tspan class="hm-rank">${i+1}</tspan></text>`;
+            body+=`<text x="${L+i*cs+cs/2}" y="${T-10}" text-anchor="middle" class="hm-label hm-rank" style="fill:${col}">${i+1}</text>`;});
+          features.forEach((a,i)=>features.forEach((b,j)=>{const v=Math.abs(corr[i][j]),fill=i===j?'#e9edf3':`rgba(36,89,196,${(0.04+0.96*v).toFixed(3)})`;
+            body+=`<rect x="${L+j*cs}" y="${T+i*cs}" width="${cs-1}" height="${cs-1}" fill="${fill}"><title>${e(a)} · ${e(b)}: |ρ| = ${n(v,3)}</title></rect>`;
+            if(hit.has(`${a}|${b}`))body+=`<rect x="${L+j*cs+1}" y="${T+i*cs+1}" width="${cs-3}" height="${cs-3}" fill="none" stroke="#c34d35" stroke-width="3"/>`;}));
+          const W=L+N*cs+6,H=T+N*cs+6;
+          const side=pairs.map(([a,b])=>{const v=Math.abs(corr[features.indexOf(a)][features.indexOf(b)]);return `<div class="hm-pair"><b>${n(v,3)}</b><span><code>${e(a)}</code> trùng <code>${e(b)}</code></span><small>→ loại ${e(a)}</small></div>`;}).join('');
+          const scale=`<div class="hm-scale"><span>|ρ| = 0</span><i></i><span>1</span></div>`;
+          return `<div class="hm-wrap"><div class="hm-plot"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ma trận tương quan 17 đặc trưng liên tục"><title>Ma trận tương quan |ρ| 17 đặc trưng liên tục</title>${body}</svg></div><aside class="hm-side"><h3>Cặp có |ρ| ≥ ${n(data.das_config.gamma,1)}</h3>${side}<p>Số = thứ hạng CRA. Chữ đỏ: cột bị loại. Ô viền đỏ: cặp trùng thông tin.</p>${scale}</aside></div>`;
         }
         case 'feature-sets':{
-          let body='';
-          [['ALL',23,17,260,C.gray],['DAS',18,12,900,C.blue]].forEach(([label,total,cont,x,color])=>{
-            body+=tx(x,45,label,'s-scene-title','text-anchor="middle"')+tx(x,152,total,'s-giant','text-anchor="middle"');
-            for(let i=0;i<23;i++)body+=rect(x-175+i%12*29,190+Math.floor(i/12)*42,22,27,i>=total?'#eff1f4':i>=cont?C.purple:color,4,i>=total?'stroke="#cbd1dc" stroke-dasharray="3 3"':'class="grow-up"');
-            body+=tx(x,310,`${cont} liên tục + 6 cố định`,'s-label','text-anchor="middle"');
-          });
-          body+=icon('select',548,125,85)+tx(590,255,'−5 cột','s-scene-title','text-anchor="middle"');
-          return frame(body,'Đối chứng ALL 23 đầu vào và DAS 18 đầu vào')+note('Cùng mẫu, cùng split và ngân sách huấn luyện. Giảm cột không suy ra cùng tỷ lệ tiết kiệm tổng chi phí.');
+          const keep=data.feature_ranking.filter(r=>r.status==='selected').map(r=>r.feature),drop=data.feature_ranking.filter(r=>r.status!=='selected');
+          const fixed=['proto_tcp','proto_udp','proto_icmp','proto_other','duration_missing','duration_zero'];
+          const chips=(xs,cls)=>`<div class="fs-chips ${cls}">${xs.map(x=>`<code>${e(x)}</code>`).join('')}</div>`;
+          const why=r=>String(r.reason).startsWith('redundant_with')?`trùng ${String(r.reason).split(':')[1].split('(')[0]}`:'ít liên quan';
+          return `<div class="fs-wrap"><section class="fs-in"><header><b>${keep.length+fixed.length}</b><span>đầu vào DAS · đưa vào huấn luyện</span></header><small>${keep.length} cột liên tục được giữ</small>${chips(keep,'keep')}<small>${fixed.length} cột cố định</small>${chips(fixed,'fix')}</section>
+            <section class="fs-out"><header><b>${drop.length}</b><span>cột bị loại</span></header>${drop.map(r=>`<div class="fs-drop"><code>${e(r.feature)}</code><span>${why(r)}</span></div>`).join('')}</section></div>
+            <div class="fs-total"><span>ALL <b>23</b></span><i>−</i><span><b>${drop.length}</b> bị loại</span><i>=</i><span class="k">DAS <b>${keep.length+fixed.length}</b></span><em>Cùng split, cùng mẫu; ALL được giữ làm đối chứng ở giai đoạn 8</em></div>`;
         }
         case 'architecture':{
           let body='';
@@ -423,7 +491,7 @@
         default:return null;
       }
     }
-    return {home,render};
+    return {home,roadmap,render};
   }
   const api={create};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;

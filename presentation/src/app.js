@@ -100,6 +100,7 @@
     const resolveId=hash=>{
       let id;
       try { id=decodeURIComponent(String(hash||'').replace(/^#/,'')); } catch (_) { return fallback; }
+      if(!id)return slides[0]?.id||fallback;
       return byId.has(id)?id:fallback;
     };
     const neighbor=(id,step)=>slides[Math.max(0,Math.min(slides.length-1,slides.findIndex(s=>s.id===resolveId(id))+step))]?.id;
@@ -274,13 +275,14 @@
       const slide=byId.get(resolveId(id));
       if(!slide) return '<p>Không còn slide nào được bật. Hãy bật lại nội dung trong slides.json.</p>';
       if(slide.view==='home') return home();
+      if(slide.view==='roadmap') return visuals?visuals.roadmap():'';
       const group=stageOf(slide),idx=group?.slides.indexOf(slide)||0;
       const sectionLabel=slide.stage==='appendix'?'PHỤ LỤC':`GIAI ĐOẠN ${String(content.stages.findIndex(g=>g.id===slide.stage)+1).padStart(2,'0')}`;
       const submenu=slide.stage==='results'?`<nav class="results-nav" aria-label="Các trang kết quả">${group.slides.map(s=>`<a href="#${s.id}" ${s.id===slide.id?'aria-current="page"':''}>${s.number}<span>${esc(s.title)}</span></a>`).join('')}</nav>`:'';
       return `<article class="slide ${slide.stage==='appendix'?'appendix-slide':''}" data-slide="${slide.id}"><header class="slide-heading">${slide.stage==='appendix'?`<div class="eyebrow"><span>${sectionLabel}</span><span>${idx+1} / ${group?.slides.length||1}</span></div><h1>${esc(slide.title)}</h1>`:`<div class="heading-row"><span class="stage-badge">${String(content.stages.findIndex(g=>g.id===slide.stage)+1).padStart(2,'0')}</span><h1 class="stage-title">${esc(group?.title||'')}</h1><span class="heading-sep" aria-hidden="true"></span><h2 class="slide-subtitle">${esc(slide.title)}</h2><span class="heading-count">${idx+1} / ${group?.slides.length||1}</span></div>`}${slide.message?`<p class="slide-message">${esc(slide.message)}</p>`:''}</header>${submenu}<div class="content-grid full-width"><section class="visual-area" aria-label="Minh họa và số liệu">${renderView(slide,state)}</section></div></article>`;
     }
     function renderMenu(id) {
-      return `<div class="drawer-head"><span>DANH MỤC · ${slides.length} TRANG ĐANG BẬT</span><button data-action="close" aria-label="Đóng danh mục">×</button></div><h2>Chọn nơi muốn trình bày</h2>${byId.has('pipeline')?`<a class="menu-home" href="#pipeline" ${id==='pipeline'?'aria-current="page"':''}>00 · Pipeline tổng quan ↗</a>`:''}${allGroups.map(g=>`<section class="menu-group"><h3>${esc(g.title)} <span>${g.slides.length}</span></h3>${g.slides.map(s=>`<a href="#${s.id}" ${s.id===id?'aria-current="page"':''}><span>${s.number}</span>${esc(s.title)}</a>`).join('')}</section>`).join('')}`;
+      return `<div class="drawer-head"><span>DANH MỤC · ${slides.length} TRANG ĐANG BẬT</span><button data-action="close" aria-label="Đóng danh mục">×</button></div><h2>Chọn nơi muốn trình bày</h2>${slides.filter(s=>s.stage==='home').map(s=>`<a class="menu-home" href="#${s.id}" ${id===s.id?'aria-current="page"':''}>${s.number} · ${esc(s.title)} ↗</a>`).join('')}${allGroups.map(g=>`<section class="menu-group"><h3>${esc(g.title)} <span>${g.slides.length}</span></h3>${g.slides.map(s=>`<a href="#${s.id}" ${s.id===id?'aria-current="page"':''}><span>${s.number}</span>${esc(s.title)}</a>`).join('')}</section>`).join('')}`;
     }
     function nav(id) {
       const slide=byId.get(resolveId(id));
@@ -315,12 +317,12 @@
       main.innerHTML=deck.render(current,stateBySlide[current]||{});
       main.scrollTop=0;
       el('stage-nav').innerHTML=deck.nav(current);
-      el('position').textContent=group?`${group.title} · ${group.slides.indexOf(slide)+1}/${group.slides.length}`:'Pipeline tổng quan · 9 giai đoạn';
+      el('position').textContent=group?`${group.title} · ${group.slides.indexOf(slide)+1}/${group.slides.length}`:(slide?.title||'Pipeline tổng quan');
       el('page-number').textContent=`${idx+1} / ${deck.slides.length}`;
       el('progress').style.width=`${(idx+1)/deck.slides.length*100}%`;
       el('previous').disabled=idx===0;el('next').disabled=idx===deck.slides.length-1;
       document.title=`${slide?.number||''} · ${slide?.title||'Thuyết trình'} — Học liên kết`;
-      document.body.classList.toggle('is-home',slide?.view==='home');
+      document.body.classList.toggle('is-home',slide?.view==='home'||slide?.view==='roadmap');document.body.classList.toggle('is-cover',slide?.view==='home');
       if(activeDrawer==='menu')menu.innerHTML=deck.renderMenu(current);
     }
     function go(id) {

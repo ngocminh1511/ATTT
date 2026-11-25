@@ -85,6 +85,24 @@ def training_histogram(prep):
             "note": "200.000 mẫu train đã chọn. Tái dựng log1p(duration_s) từ AFN lưu sẵn; có sai số float32. Không đọc test."}
 
 
+def das_correlation(ranking):
+    """Tái dựng ma trận tương quan DAS từ train ALL đã lưu (sau log1p + AFN), gộp 4 client.
+    Kiểm tra lại CRA khớp feature_selection.csv trước khi dùng."""
+    import numpy as np
+    import pandas as pd
+    names = [r["feature"] for r in ranking]
+    frame = pd.concat([pd.read_parquet(ROOT / f"{DATA}/main_all/multidataset/client_{k}.parquet") for k in CLIENTS])
+    x, y = frame[names].to_numpy(np.float64), frame["y"].to_numpy(int)
+    corr = np.corrcoef(x, rowvar=False)
+    onehot = np.eye(len(CLASSES))[y]
+    for j, row in enumerate(ranking):
+        rel = np.mean([np.corrcoef(x[:, j], onehot[:, c])[0, 1] ** 2 for c in range(len(CLASSES)) if onehot[:, c].var() > 0])
+        if not math.isclose(rel, row["relevance_pooled"], rel_tol=1e-6, abs_tol=1e-9):
+            raise ValueError(f"CRA tính lại của {row['feature']} không khớp feature_selection.csv")
+    return {"features": names, "corr": [[round(float(v), 4) for v in r] for r in corr],
+            "note": "Tương quan Pearson trên train của 4 client sau log1p + AFN; tái dựng từ artifact ALL."}
+
+
 def collect_snapshot():
     used_files = []
 
@@ -133,6 +151,8 @@ def collect_snapshot():
     used_files.append(feature_file)
     # Record the four train inputs used only for the duration histogram.
     used_files += [f"{DATA}/main/multidataset/client_{k}.parquet" for k in CLIENTS]
+    used_files += [f"{DATA}/main_all/multidataset/client_{k}.parquet" for k in CLIENTS]
+    ranking = csv_rows(ROOT / feature_file)
     evidence = [{"path": rel, "sha256": hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()}
                 for rel in used_files]
     snapshot = {"version": 1, "pipeline": das["pipeline"], "bundle_id": states[0]["bundle_id"],
@@ -141,7 +161,7 @@ def collect_snapshot():
                 "client_split": config["client_split"],
                 "dataset_catalog": dataset_catalog,
                 "das_config": prep["das"], "afn": prep["afn"], "label_map": prep["label_map"],
-                "feature_ranking": csv_rows(ROOT / feature_file), "methods": methods,
+                "feature_ranking": ranking, "das_corr": das_correlation(ranking), "methods": methods,
                 "runs": [{"run_id": s["run_id"], "state": s["state"], "bundle_id": s["bundle_id"],
                           "jobs": s["jobs"]} for s in states],
                 "histogram": training_histogram(prep), "evidence": evidence,
@@ -225,13 +245,22 @@ def validate_snapshot(data):
             best = max(method["rounds"], key=lambda r: r["val_score"])
             if best["round"] != index["mean_over_sources"]["selected_round"]:
                 raise ValueError("Best checkpoint không khớp validation")
+    corr = data.get("das_corr")
+    if not corr or corr["features"] != [r["feature"] for r in data["feature_ranking"]]:
+        raise ValueError("Thiếu ma trận tương quan DAS hoặc sai thứ tự cột")
+    idx = {f: i for i, f in enumerate(corr["features"])}
+    for r in data["feature_ranking"]:
+        if str(r.get("reason") or "").startswith("redundant_with:"):
+            other, val = r["reason"].split(":", 1)[1].split("(|r|=")
+            if abs(abs(corr["corr"][idx[r["feature"]]][idx[other]]) - float(val.rstrip(")"))) > 1e-3:
+                raise ValueError(f"|r| của {r['feature']} không khớp lý do loại")
     return True
 
 
 def validate_content(content):
     slides, stages = content["slides"], content["stages"]
-    if len(stages) != 9 or len(slides) != 34:
-        raise ValueError("Cần 9 giai đoạn, 28 trang chính và 6 phụ lục")
+    if len(stages) != 9 or len(slides) != 36:
+        raise ValueError("Cần 9 giai đoạn, 30 trang chính và 6 phụ lục")
     if len({s["id"] for s in slides}) != len(slides):
         raise ValueError("ID slide bị trùng")
     known = {s["id"] for s in stages} | {"home", "appendix"}
@@ -279,8 +308,8 @@ def build(refresh=False, check=False):
     projected = {"title": content["title"],
                  "stages": [{k: v for k, v in stage.items() if k != "output"} for stage in content["stages"]],
                  "slides": [{k: slide[k] for k in visible_fields} for slide in content["slides"]]}
-    image_path = HERE / "assets/federated-network.png"
-    assets = {"network": "data:image/png;base64," + base64.b64encode(image_path.read_bytes()).decode("ascii")}
+    logo_path = HERE / "assets/logo-dut.png"
+    assets = {"logo": "data:image/png;base64," + base64.b64encode(logo_path.read_bytes()).decode("ascii")}
     payload = json.dumps({"content": projected, "data": data, "assets": assets}, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     payload = payload.replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     html = (HERE / "src/shell.html").read_text(encoding="utf-8")
@@ -305,4 +334,4 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true", help="Kiểm tra nội dung và dữ liệu, không ghi file")
     args = parser.parse_args()
     count = build(args.refresh_data, args.check)
-    print(f"OK: {count} trang (28 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")
+    print(f"OK: {count} trang (30 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")

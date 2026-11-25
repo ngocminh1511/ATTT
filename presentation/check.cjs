@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('34 pages, 9 stages, 6 appendices',()=>{
-  assert.equal(deck.slides.length,34);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,3,5,8,2]);
+check('36 pages, 9 stages, 6 appendices',()=>{
+  assert.equal(deck.slides.length,36);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,8,2]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -50,6 +50,8 @@ check('source and metric combinations do not lose values',()=>{
   assert.ok(overview.includes('431.371')&&overview.includes('257.673')&&overview.includes('121.368')&&overview.includes('93.000'));
   assert.ok(cic.includes('12/01/2019')&&cic.includes('11/03/2019')&&cic.includes('Portmap')&&!cic.includes('SSDP'));
   assert.ok(unsw.includes('175.341')&&unsw.includes('82.332')&&overview.includes('<b>45</b>'));
+  const corrHtml=deck.render('select-corr');assert.ok(['0,977','0,953','0,986','0,998'].every(v=>corrHtml.includes(v)));
+  assert.ok(deck.render('select-sets').includes('bwd_packets_s')&&deck.render('select-das').includes('0,001'));
   const schema=deck.render('clean-schema'),quality=deck.render('clean-labels')+deck.render('clean-quality');
   for(const col of ['Flow Duration','dur','sinpkt / dinpkt','µs ÷ 10⁶','ms ÷ 10³','protocol_group'])assert.ok(schema.includes(col),col);
   for(const cls of data.classes)assert.ok(quality.includes(cls),cls);assert.ok(quality.includes('Loại dòng')&&quality.includes('Gán missing')&&quality.includes('Dừng pipeline'));
@@ -59,7 +61,8 @@ check('hash, forward/back and endpoints',()=>{
   assert.equal(deck.resolveId('#results-prox'),'results-prox');
   assert.equal(deck.resolveId('#bad-id'),'pipeline');
   assert.equal(deck.resolveId('#%E0%A4%A'),'pipeline');
-  assert.equal(deck.neighbor('pipeline',-1),'pipeline');
+  assert.equal(deck.neighbor('cover',-1),'cover');assert.equal(deck.neighbor('cover',1),'pipeline');assert.equal(deck.resolveId(''),'cover');
+  assert.equal(deck.neighbor('pipeline',-1),'cover');
   assert.equal(deck.neighbor('pipeline',1),'data-problem');
   assert.equal(deck.neighbor('appendix-qa',1),'appendix-qa');
   for(let i=0;i<deck.slides.length-1;i++)assert.equal(deck.neighbor(deck.slides[i].id,1),deck.slides[i+1].id);
@@ -68,7 +71,7 @@ check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
   changed.slides.forEach(s=>{if(s.id==='results-prox'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,31);assert.equal(d.groups.length,8);
+  assert.equal(d.slides.length,33);assert.equal(d.groups.length,8);
   assert.equal(d.neighbor('results-heterogeneity',1),'results-errors');
   assert.equal(d.neighbor('features-map',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
@@ -94,9 +97,10 @@ check('compiled HTML is standalone and speaker script matches source',()=>{
   const visibleFields=['id','number','stage','enabled','view','title','message'];
   const projected={title:content.title,stages:content.stages.map(s=>Object.fromEntries(Object.entries(s).filter(([k])=>k!=='output'))),slides:content.slides.map(s=>Object.fromEntries(visibleFields.map(k=>[k,s[k]])))};
   assert.deepEqual(inline.content,projected);assert.deepEqual(inline.data,data);
-  assert.ok(inline.assets.network.startsWith('data:image/png;base64,'));
+  assert.ok(inline.assets.logo.startsWith('data:image/png;base64,'));
   const projectedDeck=createDeck(inline);
-  const imageSrc=projectedDeck.render('pipeline').match(/<img src="([^"]+)"/)[1];
+  const cover=projectedDeck.render('cover');assert.ok(['Nguyễn Tấn Khôi','102230120','102230157','animateMotion'].every(x=>cover.includes(x)));
+  const imageSrc=cover.match(/<img src="([^"]+)"/)[1];
   assert.ok(imageSrc.startsWith('data:image/png;base64,'));
   for(const s of projectedDeck.slides)assert.ok(!/undefined|NaN/.test(projectedDeck.render(s.id).replace(/data:image\/png;base64,[^"]+/g,'[embedded image]')),s.id);
   assert.ok(!/notes-toggle|speaker-notes|ĐIỂM CẦN TRÌNH BÀY|SAU BƯỚC NÀY/.test(html));
@@ -128,7 +132,8 @@ check('mounted next/back/hash, selectors, menu, keyboard and loop step',()=>{
   context.Presentation.mount({content,data});
   assert.ok(elements.main.innerHTML.includes('pipeline-map'));
   elements.next.handlers.click();assert.equal(hash,'#data-problem');assert.ok(elements.previous.disabled===false);
-  elements.previous.handlers.click();assert.equal(hash,'#pipeline');assert.ok(elements.previous.disabled);
+  elements.previous.handlers.click();assert.equal(hash,'#pipeline');assert.ok(!elements.previous.disabled);
+  elements.previous.handlers.click();assert.equal(hash,'#cover');assert.ok(elements.previous.disabled);location.hash='#pipeline';
   elements['menu-toggle'].handlers.click();assert.equal(elements['slide-menu'].hidden,false);
   assert.equal(elements['menu-toggle'].attributes['aria-expanded'],'true');
   const key=k=>listeners.keydown({key:k,target:elements.main,preventDefault(){}});

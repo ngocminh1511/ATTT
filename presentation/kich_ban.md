@@ -6,11 +6,35 @@ Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng →
 
 Các giá trị thực nghiệm: 4 client (CIC → 1, 2; UNSW → 3, 4), profile main, seed 0; F1 tổng hợp là trung bình đều F1-macro-present hai nguồn, trừ khi ghi khác.
 
-## 00 · Từ dữ liệu phân tán đến mô hình phát hiện tấn công
+## 00 · Học liên kết phát hiện tấn công mạng
 
 **Giai đoạn:** Pipeline · **Trạng thái:** Đang bật
 
-**Thông điệp:** Một pipeline, chín giai đoạn. Bấm vào từng bước để khám phá cách thực hiện và bằng chứng.
+**Thông điệp:** Đồ án An toàn thông tin · GVHD PGS.TS Nguyễn Tấn Khôi · SVTH Phan Văn Hiếu, Đoàn Ngọc Minh.
+
+**Mục tiêu:** Giới thiệu đề tài, giảng viên hướng dẫn và nhóm thực hiện.
+
+**Nội dung trên slide:**
+
+- Đề tài: Học liên kết phát hiện tấn công mạng trên CIC-DDoS2019 và UNSW-NB15
+- GVHD: PGS.TS Nguyễn Tấn Khôi
+- SVTH: Phan Văn Hiếu (102230120), Đoàn Ngọc Minh (102230157)
+
+**Lời trình bày:**
+
+Em chào thầy. Nhóm em gồm Phan Văn Hiếu và Đoàn Ngọc Minh, thực hiện đồ án An toàn thông tin dưới sự hướng dẫn của thầy Nguyễn Tấn Khôi. Đề tài của nhóm là học liên kết để phát hiện tấn công mạng trên hai nguồn dữ liệu CIC-DDoS2019 và UNSW-NB15. Hình bên phải minh họa ý tưởng chính: server gửi mô hình chung xuống bốn client, mỗi client học trên dữ liệu riêng, chỉ gửi lại trọng số, và server tổng hợp thành mô hình mới; dữ liệu không rời khỏi client.
+
+**Chỉ vào hình:** Giới thiệu thông tin bên trái, rồi chỉ vào bốn bước đang chạy trong hình bên phải.
+
+**Chuyển ý:** Trước khi đi vào chi tiết, em giới thiệu quy trình thực hiện gồm chín giai đoạn.
+
+**Nguồn:** Thông tin đề tài do nhóm cung cấp; fl_ddos/multidataset_server.py
+
+## 01 · Quy trình thực hiện
+
+**Giai đoạn:** Pipeline · **Trạng thái:** Đang bật
+
+**Thông điệp:** Chín giai đoạn từ dữ liệu đến kết luận.
 
 **Mục tiêu:** Giúp thầy nắm toàn bộ luồng bài làm trước khi đi vào chi tiết.
 
@@ -30,7 +54,7 @@ Em xin trình bày bài làm theo luồng dữ liệu, bắt đầu từ hai b�
 
 **Nguồn:** fl_ddos/multidataset_prep.py; configs/multidataset.json
 
-## 01 · Hai bộ dữ liệu
+## 02 · Hai bộ dữ liệu
 
 **Giai đoạn:** Tổng quan dữ liệu · **Trạng thái:** Đang bật
 
@@ -56,7 +80,7 @@ Bài dùng hai bộ dữ liệu công khai. CIC-DDoS2019 có khoảng bốn tră
 
 **Nguồn:** presentation/data/datasets.json; configs/multidataset.json: label_map; https://www.unb.ca/cic/datasets/ddos-2019.html; https://research.unsw.edu.au/projects/unsw-nb15-dataset
 
-## 02 · Chuẩn hóa schema & đơn vị
+## 03 · Chuẩn hóa schema & đơn vị
 
 **Giai đoạn:** Làm sạch & đồng nhất · **Trạng thái:** Đang bật
 
@@ -82,7 +106,7 @@ Hai bộ đặt tên cột và dùng đơn vị khác nhau, nên em chuẩn hóa
 
 **Nguồn:** fl_ddos/dataset_adapters.py: CIC_FIELDS, cic_frame, unsw_frame, protocol_group; data_paper_multi_4c/main/quality_report.json: compatibility_checks
 
-## 03 · Gom nhãn về 3 lớp
+## 04 · Gom nhãn về 3 lớp
 
 **Giai đoạn:** Làm sạch & đồng nhất · **Trạng thái:** Đang bật
 
@@ -108,7 +132,7 @@ Hai bộ dữ liệu đặt tên nhãn khác nhau, nên em dùng một bảng á
 
 **Nguồn:** configs/multidataset.json: label_map; fl_ddos/dataset_adapters.py: build_label_lookup; presentation/data/datasets.json: label_counts
 
-## 04 · Kiểm tra chất lượng
+## 05 · Kiểm tra chất lượng
 
 **Giai đoạn:** Làm sạch & đồng nhất · **Trạng thái:** Đang bật
 
@@ -134,7 +158,7 @@ Sau khi chuẩn hóa, mỗi dòng có bảy số đo, giao thức và nhãn; em 
 
 **Nguồn:** fl_ddos/dataset_adapters.py: finalize, protocol_group; fl_ddos/multidataset_prep.py: PrepError nhãn lạ; data_paper_multi_4c/main/quality_report.json
 
-## 05 · Tách test & validation
+## 06 · Tách test & validation
 
 **Giai đoạn:** Phân chia dữ liệu · **Trạng thái:** Đang bật
 
@@ -160,7 +184,7 @@ Bước đầu tiên là giữ riêng tập test: CIC dùng ngày thu thập kh�
 
 **Nguồn:** fl_ddos/multidataset_prep.py: split_train_val, build_splits, independence_checks
 
-## 06 · Lấy subset & chia 4 client
+## 07 · Lấy subset & chia 4 client
 
 **Giai đoạn:** Phân chia dữ liệu · **Trạng thái:** Đang bật
 
@@ -187,7 +211,7 @@ Từ các tập đã tách, mỗi nguồn em lấy một subset cố định: m�
 
 **Nguồn:** data_paper_multi_4c/main/sampling_report.md; fl_ddos/multidataset_prep.py: choose_subsets, split_shards, client_frames; configs/multidataset.json: clients, client_split; data_paper_multi_4c/main/dataset_manifest.json
 
-## 07 · 8 trường cơ sở → 23 cột đầu vào
+## 08 · 8 trường cơ sở → 23 cột đầu vào
 
 **Giai đoạn:** Xây dựng đặc trưng · **Trạng thái:** Đang bật
 
@@ -213,7 +237,7 @@ Từ tám trường cơ sở, bảy trường số được giữ nguyên. Em t�
 
 **Nguồn:** fl_ddos/multidataset_prep.py: CONTINUOUS, FIXED, derive
 
-## 08 · Bước 1 · Biến đổi log1p
+## 09 · Bước 1 · Biến đổi log1p
 
 **Giai đoạn:** Chuẩn hóa dữ liệu · **Trạng thái:** Đang bật
 
@@ -239,7 +263,7 @@ Chuẩn hóa gồm hai bước. Bước một là biến đổi log1p: mỗi gi�
 
 **Nguồn:** fl_ddos/multidataset_prep.py: log1p_valid; data_paper_multi_4c/main/prep_params.json và train client_1..4.parquet
 
-## 09 · Bước 2 · Chuẩn hóa z-score theo giao thức (AFN)
+## 10 · Bước 2 · Chuẩn hóa z-score theo giao thức (AFN)
 
 **Giai đoạn:** Chuẩn hóa dữ liệu · **Trạng thái:** Đang bật
 
@@ -266,79 +290,109 @@ Bước hai là chuẩn hóa z-score, em gọi là AFN, tức chuẩn hóa đặ
 
 **Nguồn:** fl_ddos/multidataset_prep.py: afn_stats, aggregate_afn, apply_afn
 
-## 10 · DAS giữ thông tin liên quan, lọc phần dư thừa
+## 11 · Nguyên lý DAS (Dual Adaptive Selector)
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
-**Thông điệp:** CRA xếp hạng theo nhãn; IDF duyệt theo thứ hạng để loại cột trùng thông tin.
+**Thông điệp:** DAS gồm hai bước: CRA chấm điểm mức liên quan của từng đặc trưng với nhãn, IDF duyệt theo điểm để bỏ cột trùng thông tin.
 
 **Mục tiêu:** Giải thích tiêu chí DAS theo đúng triển khai thay vì xem đây là hộp đen.
 
 **Nội dung trên slide:**
 
-- CRA: trung bình r² với chỉ báo từng lớp có phương sai
-- IDF: bỏ cột có |r| ≥ 0,9 với cột đã chọn
-- Relevance > 0,001; tối đa 12 cột liên tục
+- CRA: trung bình ρ² giữa đặc trưng và chỉ báo từng lớp
+- IDF: bỏ nếu relevance ≤ 0,001 hoặc |ρ| ≥ 0,9 với cột đã giữ
+- Tối đa 12 cột liên tục; 6 cột cố định không qua DAS
 
 **Lời trình bày:**
 
-DAS trong pipeline gồm hai phần. CRA đo liên quan bằng bình phương tương quan giữa đặc trưng và chỉ báo từng lớp, rồi lấy trung bình các lớp có phương sai. Thống kê được gộp từ train của bốn client, tức hai nguồn. Sau khi xếp relevance giảm dần, IDF xét từng đặc trưng: bỏ cột hằng, cột có relevance không vượt 0,001, hoặc cột có tương quan tuyệt đối từ 0,9 với một cột đã giữ. Số cột liên tục được giữ không vượt mười hai. Nhãn chỉ tham gia chọn đặc trưng trên train; không dùng nhãn validation hoặc test để quyết định danh sách. Đây là chọn một bộ chung cho cả bốn client, chưa phải chọn riêng theo nguồn.
+DAS, viết tắt của Dual Adaptive Selector, gồm hai bước. Bước một là CRA, Conditional Relevance Assessor: với mỗi đặc trưng, em tính hệ số tương quan với chỉ báo của từng lớp, bình phương lên rồi lấy trung bình; điểm càng cao thì đặc trưng càng giúp phân biệt các lớp. Bước hai là IDF, Iterative Dependency Filter: duyệt các đặc trưng theo điểm từ cao xuống thấp, bỏ cột có điểm quá thấp, bỏ cột tương quan từ 0,9 trở lên với một cột đã giữ vì trùng thông tin, và dừng khi đủ mười hai cột.
 
-**Chỉ vào hình:** Theo ba cửa lọc: liên quan → dư thừa → giới hạn số lượng.
+**Chỉ vào hình:** Đọc công thức CRA bên trái, rồi bốn bước IDF bên phải; dải dưới tóm tắt luồng 17 → 12.
 
-**Chuyển ý:** Bảng xếp hạng thực tế cho biết các tiêu chí này đã loại những cột nào.
+**Chuyển ý:** Áp dụng lên dữ liệu thật, đây là điểm CRA của 17 đặc trưng.
 
-**Nguồn:** fl_ddos/multidataset_prep.py: das_stats, das_relevance, das_select
+**Nếu thầy hỏi:** Thống kê tính trên train sau log1p + AFN, gộp từ 4 client bằng các tổng đủ (n, Σx, Σxxᵀ, Σx·y), không dùng validation hay test. Cột hằng có relevance = 0.
 
-## 11 · Từ tiêu chí đến quyết định giữ hoặc loại
+**Nguồn:** fl_ddos/multidataset_prep.py: das_relevance, das_select; configs/multidataset.json: das
+
+## 12 · Kết quả CRA: điểm liên quan của 17 đặc trưng
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
-**Thông điệp:** Danh sách thực tế giữ 12 cột liên tục, loại bốn cột dư thừa và một cột ít liên quan.
+**Thông điệp:** 12 cột được giữ; 4 cột bị loại vì trùng thông tin, 1 cột vì relevance quá thấp.
 
 **Mục tiêu:** Giải thích các quyết định DAS bằng số liệu và quan sát khác biệt relevance giữa các client.
 
 **Nội dung trên slide:**
 
-- total_bytes tương quan 0,977 với fwd_bytes
-- total_packets tương quan 0,986 với fwd_packets
-- bwd_iat_mean_s bị loại do relevance ≤ 0,001
+- Cao nhất: bwd_packets_s, fwd_packet_size_mean, bwd_byte_fraction
+- 4 cột trùng thông tin: total_bytes, bwd_bytes, total_packets, fwd_packets_s
+- bwd_iat_mean_s: relevance ≈ 0
 
 **Lời trình bày:**
 
-Bảng này lấy trực tiếp từ feature_selection.csv. bwd_packets_s có relevance gộp cao nhất, tiếp theo là fwd_packet_size_mean và các tỷ lệ chiều về. total_bytes dù có relevance tương đối cao vẫn bị loại vì tương quan 0,977 với fwd_bytes đã chọn. total_packets cũng bị loại do tương quan với fwd_packets. Ngược lại, bwd_iat_mean_s bị loại vì relevance gộp quá thấp. Bộ chọn pooled hoặc từng client cho thấy cùng một đặc trưng có thể liên quan rất khác theo miền: hai client CIC gần như giống nhau, còn khác biệt lớn nằm giữa client CIC và client UNSW. Tuy nhiên, đổi cách xem biểu đồ không làm hệ thống chọn lại danh sách; quyết định giữ hoặc loại vẫn là kết quả pooled trên train.
+Đây là điểm CRA thực tế của mười bảy đặc trưng, sắp từ cao xuống thấp. Màu xanh là cột được giữ. Bốn cột màu cam có điểm khá cao nhưng bị loại vì gần như trùng với một cột đã giữ phía trên, ví dụ total_bytes trùng fwd_bytes. Cột xám bwd_iat_mean_s bị loại vì điểm gần bằng không.
 
-**Chỉ vào hình:** Đổi giữa pooled, client CIC và client UNSW rồi chỉ total_bytes và bwd_iat_mean_s; màu thể hiện quyết định pooled.
+**Chỉ vào hình:** Chỉ ba cột đầu, rồi các dòng cam và lý do bên phải.
 
-**Chuyển ý:** Từ đây em tạo hai cấu hình đầu vào để đo riêng đóng góp của bước chọn đặc trưng.
+**Chuyển ý:** Ma trận tương quan cho thấy rõ vì sao bốn cột kia bị coi là trùng.
+
+**Nếu thầy hỏi:** Trùng thông tin được đo bằng hệ số tương quan Pearson |ρ| trên train giữa cột đang xét và từng cột đã giữ; |ρ| ≥ 0,9 nghĩa là biết cột này gần như đoán được cột kia. Ví dụ total_bytes = fwd_bytes + bwd_bytes mà byte chủ yếu đi chiều đi, nên total_bytes ≈ fwd_bytes. Thứ hạng theo thống kê gộp 4 client; relevance từng client ở phụ lục A4.
 
 **Nguồn:** data_paper_multi_4c/main/feature_selection.csv
 
-## 12 · ALL và DAS khác nhau ở bộ đầu vào
+## 13 · Kết quả IDF: lọc cột trùng qua ma trận tương quan
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
-**Thông điệp:** Cùng split, cùng mẫu và cùng quy trình chuẩn hóa; so sánh 23 với 18 đầu vào.
+**Thông điệp:** Bốn cặp có |ρ| ≥ 0,9; trong mỗi cặp, cột có điểm CRA thấp hơn bị loại.
+
+**Mục tiêu:** Cho thấy bằng số liệu thật vì sao IDF loại các cột trùng thông tin.
+
+**Nội dung trên slide:**
+
+- total_bytes – fwd_bytes: 0,977
+- bwd_bytes – bwd_packets: 0,953
+- total_packets – fwd_packets: 0,986 · fwd_packets_s – flow_packets_s: 0,998
+
+**Lời trình bày:**
+
+Mỗi ô là trị tuyệt đối hệ số tương quan giữa hai đặc trưng, màu càng đậm càng giống nhau. Bốn ô viền đỏ là các cặp có tương quan từ 0,9 trở lên, ví dụ fwd_packets_s và flow_packets_s gần như bằng nhau với 0,998. Trong mỗi cặp, IDF giữ cột có điểm CRA cao hơn và bỏ cột còn lại, nên mô hình không phải học cùng một thông tin hai lần.
+
+**Chỉ vào hình:** Chỉ các ô viền đỏ trên ma trận rồi đối chiếu với danh sách bên phải.
+
+**Chuyển ý:** Kết quả cuối cùng là bộ đầu vào đưa vào huấn luyện.
+
+**Nếu thầy hỏi:** Ma trận được tính lại từ train đã lưu (artifact ALL, 4 client, sau log1p + AFN); bộ build kiểm tra CRA và |ρ| khớp với feature_selection.csv.
+
+**Nguồn:** data_paper_multi_4c/main_all/multidataset/client_*.parquet; data_paper_multi_4c/main/feature_selection.csv; presentation/build.py: das_correlation
+
+## 14 · Bộ đầu vào cuối cùng
+
+**Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
+
+**Thông điệp:** 18 đầu vào DAS = 12 cột liên tục được giữ + 6 cột cố định; ALL 23 cột giữ làm đối chứng.
 
 **Mục tiêu:** Chốt thiết kế đối chứng đặc trưng trước khi trình bày kết quả.
 
 **Nội dung trên slide:**
 
-- ALL: toàn bộ 17 cột liên tục hợp lệ + 6 cột cố định
-- DAS: 12 cột liên tục được chọn + 6 cột cố định
-- Không suy ra mức tiết kiệm thời gian hay truyền thông từ tỷ lệ giảm cột
+- 12 cột liên tục được giữ
+- 6 cột cố định: 4 one-hot giao thức + 2 cờ duration
+- 5 cột bị loại; ALL 23 cột dùng làm đối chứng
 
 **Lời trình bày:**
 
-Nhánh ALL giữ toàn bộ mười bảy cột liên tục hợp lệ, còn DAS giữ mười hai cột đã chọn. Cả hai cùng có sáu cột cố định nên đầu vào cuối là hai mươi ba và mười tám cột. Hash split của hai artifact giống nhau, giúp bảo đảm đối chứng không thay đổi mẫu dữ liệu khi đổi đặc trưng. Hai nhánh dùng cùng kiến trúc tổng quát và ngân sách huấn luyện, nhưng lớp Linear đầu vào có kích thước phụ thuộc số cột. Giảm cột chỉ cho thấy biểu diễn gọn hơn; chưa thể suy ra phần trăm giảm chi phí toàn mô hình hoặc thời gian. Các kết quả dự đoán sẽ được kiểm chứng ở giai đoạn tám.
+Kết quả của DAS là mười tám đầu vào để huấn luyện: mười hai cột liên tục được giữ và sáu cột cố định. Năm cột bị loại nằm bên phải cùng lý do. Em vẫn giữ bộ ALL hai mươi ba cột làm đối chứng, cùng split và cùng mẫu, để kiểm tra ở giai đoạn kết quả xem bỏ năm cột này ảnh hưởng thế nào.
 
-**Chỉ vào hình:** Chỉ hai nhánh, sáu cột giữ chung, và dấu xác nhận cùng split.
+**Chỉ vào hình:** Đọc khối xanh (đưa vào huấn luyện), khối xám (bị loại), rồi dải ALL − 5 = DAS.
 
-**Chuyển ý:** Sau khi cố định đầu vào, em trình bày kiến trúc sẽ học trên các vector này.
+**Chuyển ý:** Với bộ đầu vào này, em chuyển sang kiến trúc mô hình và cách huấn luyện.
 
 **Nguồn:** data_paper_multi_4c/main/features.json; data_paper_multi_4c/main_all/features.json
 
-## 13 · ResVGG-SwinNet học trên biểu diễn của flow
+## 15 · ResVGG-SwinNet học trên biểu diễn của flow
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -364,7 +418,7 @@ Mô hình nhận vector mười tám hoặc hai mươi ba đặc trưng tùy c�
 
 **Nguồn:** fl_ddos/models.py: ResVGGSwinNet
 
-## 14 · Local, centralized và FL tổ chức việc học ra sao?
+## 16 · Local, centralized và FL tổ chức việc học ra sao?
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -390,7 +444,7 @@ Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học d�
 
 **Nguồn:** baselines/multidataset_baselines.py; fl_ddos/multidataset_server.py; https://proceedings.mlr.press/v54/mcmahan17a.html
 
-## 15 · Một vòng FedAvg: gửi, học, nhận, tổng hợp
+## 17 · Một vòng FedAvg: gửi, học, nhận, tổng hợp
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -417,7 +471,7 @@ Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học d�
 
 **Nguồn:** fl_ddos/multidataset_server.py; fl_ddos/task.py: train; configs/multidataset.json: fl
 
-## 16 · FedProx: thêm điểm neo cho việc học tại client
+## 18 · FedProx: thêm điểm neo cho việc học tại client
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -443,7 +497,7 @@ FedProx thay đổi mục tiêu học tại client bằng cách cộng một s�
 
 **Nguồn:** fl_ddos/task.py: train; fl_ddos/multidataset_server.py; https://arxiv.org/abs/1812.06127
 
-## 17 · Cố định đối chứng, chọn mô hình bằng validation
+## 19 · Cố định đối chứng, chọn mô hình bằng validation
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -469,7 +523,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json; results_modal_multidataset/20261122_235344_298853/status_snapshot.json; baselines/multidataset_baselines.py
 
-## 18 · Ba câu hỏi đánh giá, ba cách đọc kết quả
+## 20 · Ba câu hỏi đánh giá, ba cách đọc kết quả
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -493,7 +547,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** fl_ddos/multidataset_eval.py: source_metrics, binary_block, evaluate_checkpoint
 
-## 19 · Học liên kết chỉ vượt local rõ rệt khi dùng FedProx
+## 21 · Học liên kết chỉ vượt local rõ rệt khi dùng FedProx
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -519,7 +573,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 20 · Local gặp khó khi chuyển sang nguồn chưa học
+## 22 · Local gặp khó khi chuyển sang nguồn chưa học
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -543,7 +597,7 @@ Mỗi hàng là một mô hình, mỗi cột là một nguồn test. Hai local C
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 21 · Với 4 client, DAS không nâng F1 tổng hợp
+## 23 · Với 4 client, DAS không nâng F1 tổng hợp
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -569,7 +623,7 @@ Mỗi hàng là một mô hình, mỗi cột là một nguồn test. Hai local C
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
 
-## 22 · DAS giảm F1, đổi lại ít báo động giả hơn
+## 24 · DAS giảm F1, đổi lại ít báo động giả hơn
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -593,7 +647,7 @@ DAS không tốt hơn trên mọi chỉ số, nhưng cũng không kém trên m�
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
 
-## 23 · Chung đầu vào chưa làm hai nguồn học giống nhau
+## 25 · Chung đầu vào chưa làm hai nguồn học giống nhau
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -619,7 +673,7 @@ Biểu đồ hiển thị đủ ba mươi vòng validation, đường CIC và UN
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/fl/*_rounds.csv; results_modal_multidataset/20261122_152058_5ec64a/main/all/fl/*_rounds.csv
 
-## 24 · FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng
+## 26 · FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -645,7 +699,7 @@ Với cùng bộ DAS và bốn client, FedProx đạt F1-macro trung bình 56,99
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 25 · Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp
+## 27 · Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -669,7 +723,7 @@ Trong ma trận, mỗi hàng là nhãn thật và mỗi cột là nhãn dự đo
 
 **Nguồn:** results_modal_multidataset/*/main/*/confusion.csv; results_modal_multidataset/*/main/*/per_class.csv
 
-## 26 · Đóng góp nằm ở cả pipeline và cách kiểm chứng
+## 28 · Đóng góp nằm ở cả pipeline và cách kiểm chứng
 
 **Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
 
@@ -693,7 +747,7 @@ Bài làm xây dựng được một pipeline từ hai nguồn dữ liệu khác
 
 **Nguồn:** data_paper_multi_4c/main/quality_report.json; results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 27 · Từ kết quả thực nghiệm đến bước phát triển tiếp
+## 29 · Từ kết quả thực nghiệm đến bước phát triển tiếp
 
 **Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
 
