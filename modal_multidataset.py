@@ -107,7 +107,8 @@ def report(run_id: str, statuses: list[dict], profile: str):
     vol.commit()
 
 
-@app.function(cpu=.5, memory=2048, volumes={VOL: vol}, timeout=24 * 3600, retries=0)
+# nonpreemptible: bộ điều phối bị thu hồi rồi chạy lại sẽ gặp "Run ID đã tồn tại" và kéo app (cùng job GPU) dừng theo.
+@app.function(cpu=.5, memory=2048, volumes={VOL: vol}, timeout=24 * 3600, retries=0, nonpreemptible=True)
 def run_all(bundle: dict, cfg: dict, run_id: str, smoke_only: bool = False, only: list | None = None):
     vol.reload()
     run_root = Path(VOL, "runs", run_id)
