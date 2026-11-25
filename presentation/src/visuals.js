@@ -249,16 +249,34 @@
             body+=tx(x0+245,30,j?'Sau log1p':'Trước log1p','s-scene-title','text-anchor="middle"');
             [0,.5,1].forEach(t=>body+=`<line x1="${x0}" y1="${base-t*190}" x2="${x0+pw}" y2="${base-t*190}" class="plot-grid"/>`+tx(x0-10,base-t*190+5,n(t*max/hist.n*100)+'%','s-axis','text-anchor="end"'));
             hist.counts.forEach((val,i)=>body+=rect(x0+i*pw/20,base-val/max*190,pw/20-3,val/max*190,j?C.blue:C.gray,3,`class="grow-up" style="--order:${i*.12}"`));
-            body+=tx(x0,302,'0','s-axis')+tx(x0+pw,302,n(hist.max,j?2:0),'s-axis','text-anchor="end"')+tx(x0+245,338,j?'ln(1 + giây)':'duration_s · giây','s-label','text-anchor="middle"');
+            body+=tx(x0,302,'0','s-axis')+tx(x0+pw,302,n(hist.max,j?2:0),'s-axis','text-anchor="end"')+tx(x0+245,338,j?'ln(1 + giây)':'giây','s-label','text-anchor="middle"');
           });
-          return `<div class="math-ribbon"><span>0 → 0</span><span>999 → 6,91</span><span>999.999 → 13,82</span></div>`+frame(body,'Histogram duration thực tế trước và sau log1p')+note('200.000 mẫu train; tái dựng từ AFN đã lưu, có sai số float32. Hai trục x khác miền giá trị.');
+          const formula=`<div class="nz-formula"><b>x′ = ln(1 + x)</b><span>Áp cho <strong>cả 17 cột liên tục</strong></span><span>x âm hoặc ∞ → missing</span><span>6 cột 0/1 giữ nguyên</span></div>`;
+          return formula+`<p class="nz-caption">Ví dụ trên cột <code>duration_s</code> · ${n(data.histogram.raw.n)} mẫu train</p>`+frame(body,'Phân bố duration_s trước và sau log1p');
         }
         case 'afn':{
-          let body=icon('server',100,80,80)+icon('server',100,235,80,C.coral)+tx(205,120,'CIC · thống kê train','s-label')+tx(205,275,'UNSW · thống kê train','s-label');
-          const a='M455,115C530,115 515,185 590,185',b='M455,270C530,270 515,185 590,185';
-          body+=edge(a,C.blue,true)+edge(b,C.coral,true)+pulse(a,C.blue)+pulse(b,C.coral,-1.5)+circle(660,185,61,'#e8effc')+tx(660,197,'μ, σ','s-number','text-anchor="middle"')+edge('M735,185L860,185',C.blue,true)+tx(1005,170,'z = (x − μ) / σ','s-formula','text-anchor="middle"')+tx(1005,219,'Theo nhóm giao thức','s-label','text-anchor="middle"');
-          body+=tx(600,36,'n hợp lệ · tổng · tổng bình phương','s-axis','text-anchor="middle"');
-          return frame(body,'Gộp thống kê train để chuẩn hóa theo giao thức')+`<div class="evidence-line"><span class="train-lock">FIT: TRAIN</span><span>Validation / test chỉ transform</span><span>Missing → z = 0 · Có tham số dự phòng</span></div>`;
+          // Ví dụ thật từ tham số AFN đã lưu: cùng một giá trị total_packets, z khác nhau theo giao thức.
+          const afn=data.afn,col='total_packets',ci=afn.columns.indexOf(col),raw=25,lx=Math.log1p(raw);
+          const par=g=>({mu:afn.groups[g].mean[ci],sd:afn.groups[g].scale[ci]});
+          const row=(g,name,cls)=>{const {mu,sd}=par(g),z=(lx-mu)/sd;
+            return `<div class="nz-row ${cls}"><b>${name}</b><span>μ = ${n(mu,2)} <small>(≈ ${n(Math.expm1(mu),0)} gói)</small></span><span>σ = ${n(sd,2)}</span><strong>z = ${z>=0.005?'+':''}${n(z,2)}</strong></div>`;};
+          const steps=[['1','Tách train theo giao thức','Mỗi flow thuộc một nhóm TCP / UDP / ICMP / OTHER'],
+            ['2','Tính μ, σ cho từng cột trong từng nhóm','Mỗi client gửi n, Σx, Σx²; server cộng lại từ 4 client, không gửi dòng dữ liệu'],
+            ['3','z = (x′ − μ<sub>nhóm</sub>) / σ<sub>nhóm</sub>','z = 0: bằng mức trung bình của giao thức đó']];
+          const left=`<div class="nz-steps">${steps.map(([k,t,d])=>`<div class="nz-step"><i>${k}</i><div><b>${t}</b><span>${d}</span></div></div>`).join('')}</div>`;
+          const right=`<div class="nz-example"><header>Vì sao theo giao thức? Ví dụ thật</header>
+            <p>Một flow có <code>${col}</code> = ${raw} gói → x′ = ln(1 + ${raw}) = ${n(lx,2)}</p>
+            ${row('tcp','Nếu là TCP','tcp')}${row('udp','Nếu là UDP','udp')}${row('__all__','Nếu không tách giao thức','all')}
+            <p class="nz-take">TCP thường nhiều gói hơn UDP, nên 25 gói là <b>bình thường với TCP</b> nhưng <b>cao với UDP</b>. Không tách giao thức thì hai mức này bị trộn.</p></div>`;
+          // Mức điển hình (exp(μ) − 1, quy về đơn vị gốc) của từng giao thức trên train: lý do phải tách nhóm.
+          const big=v=>v>=1e6?n(v/1e6,1)+' tr':v>=1e3?n(v/1e3,1)+' nghìn':n(v,v<10?2:0);
+          const typ=(g,c)=>Math.expm1(afn.groups[g].mean[afn.columns.indexOf(c)]);
+          const metrics=[['total_packets','gói / flow',v=>n(v,0)],['duration_s','giây / flow',v=>n(v,2)],['flow_bytes_s','byte / giây',big]];
+          const protos=[['tcp','TCP'],['udp','UDP'],['other','OTHER'],['icmp','ICMP']].filter(([g])=>afn.groups[g]);
+          const table=`<div class="nz-protos"><header>Mỗi giao thức có mức "bình thường" riêng <small>· μ của từng nhóm trên train, quy về đơn vị gốc · ICMP chỉ ${n(afn.groups.icmp?.n_rows||0)} dòng nên không đọc</small></header>
+            <div class="nz-pgrid" style="--cols:${protos.length}"><span></span>${protos.map(([g,name])=>`<b>${name}<small>${n(afn.groups[g].n_rows)} dòng</small></b>`).join('')}
+            ${metrics.map(([c,unit,f])=>`<span>${unit}</span>${protos.map(([g])=>`<em>${afn.groups[g].n_rows<100?'—':f(typ(g,c))}</em>`).join('')}`).join('')}</div></div>`;
+          return `<div class="nz-grid">${left}${right}</div>${table}<div class="nz-rules"><span class="train-lock">μ, σ chỉ học từ train</span><span>Validation / test áp lại, không học lại</span><span>σ ≈ 0 → dùng 1</span><span>Nhóm không có mẫu → dùng μ, σ chung</span><span>Missing → z = 0</span></div>`;
         }
         case 'das':{
           let body='';

@@ -134,37 +134,11 @@ Sau khi chuẩn hóa, mỗi dòng có bảy số đo, giao thức và nhãn; em 
 
 **Nguồn:** fl_ddos/dataset_adapters.py: finalize, protocol_group; fl_ddos/multidataset_prep.py: PrepError nhãn lạ; data_paper_multi_4c/main/quality_report.json
 
-## 05 · Mỗi nguồn dữ liệu chia cho hai client
+## 05 · Tách test & validation
 
 **Giai đoạn:** Phân chia dữ liệu · **Trạng thái:** Đang bật
 
-**Thông điệp:** CIC và UNSW vẫn tách riêng; trong mỗi nguồn, train và validation chia đều cho hai client theo nhãn gốc.
-
-**Mục tiêu:** Làm rõ ranh giới dữ liệu, cách chia bốn client và tổ chức mô phỏng federated learning.
-
-**Nội dung trên slide:**
-
-- Client 1, 2 · partition 0, 1 · CIC-DDoS2019
-- Client 3, 4 · partition 2, 3 · UNSW-NB15
-- Mỗi client 50.000 train / 10.000 validation; test giữ theo nguồn
-
-**Lời trình bày:**
-
-Bản hiện tại dùng bốn client. Hai client đầu, partition 0 và 1, giữ dữ liệu CIC; hai client sau, partition 2 và 3, giữ dữ liệu UNSW. Trong mỗi nguồn, train và validation được chia đều cho hai client bằng cách phân tầng theo nhãn gốc, xếp vòng với seed cố định, nên mỗi client có năm mươi nghìn mẫu train và mười nghìn mẫu validation với tỷ lệ nhãn gần như nhau. Như vậy hai client cùng nguồn gần IID với nhau, còn khác biệt lớn vẫn nằm giữa CIC và UNSW: loại tấn công, tỷ lệ lớp và cách đo flow. Server kiểm tra nhận đủ bốn phản hồi đúng PID ở mỗi vòng. Test không chia theo client mà giữ theo nguồn, và cùng một checkpoint toàn cục được chấm trên hai test. Các client chạy trên cùng hạ tầng mô phỏng; hình mô tả tổ chức logic, không khẳng định cách ly vật lý.
-
-**Chỉ vào hình:** Chỉ hai khối nguồn, mỗi khối hai client với số mẫu bằng nhau; dữ liệu không đi qua mũi tên cập nhật mô hình.
-
-**Chuyển ý:** Bên trong mỗi nguồn, trước khi chia client, em tách dữ liệu học, chọn mô hình và kiểm tra cuối cùng.
-
-**Nếu thầy hỏi:** Chia hai client trong cùng nguồn làm tăng số bên tham gia nhưng không tạo thêm khác biệt phân phối; khác biệt chính vẫn là giữa hai nguồn.
-
-**Nguồn:** configs/multidataset.json: clients, client_split; fl_ddos/multidataset_prep.py: chia client phân tầng; data_paper_multi_4c/main/dataset_manifest.json; fl_ddos/multidataset_server.py: pid_map
-
-## 06 · Chia tập trước mọi bước học tham số
-
-**Giai đoạn:** Phân chia dữ liệu · **Trạng thái:** Đang bật
-
-**Thông điệp:** Test giữ riêng theo nguồn; train/validation được phân tầng theo nhóm fingerprint.
+**Thông điệp:** Test giữ riêng theo nguồn; phần còn lại chia train/validation theo nhóm fingerprint.
 
 **Mục tiêu:** Hiểu quy tắc tách tập và giới hạn của kiểm tra độc lập dữ liệu.
 
@@ -176,131 +150,115 @@ Bản hiện tại dùng bốn client. Hai client đầu, partition 0 và 1, gi�
 
 **Lời trình bày:**
 
-Test được giữ riêng từ đầu theo quy ước nguồn: CIC dùng hai nhóm file tương ứng các ngày khác nhau, còn UNSW dùng tập testing đã cung cấp. Phần pool còn lại được chia train và validation bằng StratifiedGroupKFold. Fingerprint được tạo từ vector đo gốc, không dùng nhãn hoặc ID; các dòng cùng fingerprint nằm cùng nhóm nên không đi sang hai phía train và validation. Hệ thống chọn fold validation có đủ lớp có mặt trong nguồn. Báo cáo hiện tại xác nhận không có nhóm giao nhau giữa train và validation. Tuy vậy, vẫn có vector trùng với test được báo cáo riêng; không được kết luận toàn bộ train/test hoàn toàn không trùng chỉ từ phép kiểm tra train/validation.
+Bước đầu tiên là giữ riêng tập test: CIC dùng ngày thu thập khác, UNSW dùng testing-set có sẵn. Phần còn lại chia train và validation bằng năm fold theo nhóm fingerprint, nên các dòng trùng giá trị đo luôn nằm cùng một phía. Mọi bước học tham số như chuẩn hóa hay chọn đặc trưng chỉ làm sau bước này.
 
 **Chỉ vào hình:** Chỉ test tách trước, năm fold, và hai mẫu cùng màu luôn ở cùng phía.
 
-**Chuyển ý:** Sau khi chia, em giới hạn số mẫu và kiểm soát độ đại diện của từng lớp.
+**Chuyển ý:** Từ các tập đã tách, em lấy một subset có kiểm soát cho mỗi nguồn.
 
-**Nếu thầy hỏi:** Không nói chia ngẫu nhiên 80/20 cho toàn bộ dữ liệu; quota cuối cùng còn thay đổi số mẫu từng tập.
+**Nếu thầy hỏi:** Dùng StratifiedGroupKFold 5 fold, seed 42; fingerprint tạo từ vector đo gốc, không dùng nhãn hay ID. Báo cáo xác nhận không có nhóm giao nhau giữa train và validation. Vẫn có vector trùng với test được báo cáo riêng, nên không khẳng định train/test tuyệt đối khác nhau.
 
 **Nguồn:** fl_ddos/multidataset_prep.py: split_train_val, build_splits, independence_checks
 
-## 07 · Lấy subset có kiểm soát, không nhân bản mẫu
+## 06 · Lấy subset & chia 4 client
 
 **Giai đoạn:** Phân chia dữ liệu · **Trạng thái:** Đang bật
 
-**Thông điệp:** Mỗi nguồn dùng 100.000 train, 20.000 validation và 50.000 test trong bản main.
+**Thông điệp:** Mỗi nguồn lấy 100.000 train / 20.000 val / 50.000 test, rồi chia train và val cho hai client theo từng nhãn gốc.
 
-**Mục tiêu:** Phân biệt lấy mẫu, cân bằng bằng loss và sinh thêm mẫu.
+**Mục tiêu:** Gộp bước lấy subset với cơ chế chia client; nói rõ chia theo gì, để làm gì, và non-IID nằm ở đâu.
 
 **Nội dung trên slide:**
 
-- Train: đặt sàn lớp rồi phân bổ phần ngân sách còn lại
-- Val/test: quota theo tỷ lệ lớp tự nhiên của nguồn
-- UNSW DoS chỉ có 9.811 mẫu train thật: giữ toàn bộ
+- Subset: train đặt sàn lớp rồi chia theo tỷ lệ gốc; val/test giữ tỷ lệ tự nhiên; không nhân bản mẫu
+- Chia client: trong từng nhãn gốc xáo bằng seed rồi chia lần lượt 1, 2, 1, 2…; không chia theo giao thức
+- Mục đích: hai client cùng nguồn có cùng phân bố nhãn (lệch ≤ 1 mẫu/nhãn) và nhận các dòng rời nhau
+- Test không chia theo client, giữ theo nguồn
 
 **Lời trình bày:**
 
-Chính sách lấy mẫu hiện tại đặt sàn mười nghìn mẫu cho mỗi lớp có mặt trong train, sau đó phân bổ ngân sách còn lại theo số lượng gốc. UNSW chỉ có 9.811 mẫu DoS trong phần train khả dụng nên hệ thống giữ toàn bộ và ghi cảnh báo, không nhân bản để đạt sàn. Validation và test giữ tỷ lệ lớp của nguồn, đồng thời bảo đảm support tối thiểu khi có đủ mẫu thật. Với lần chuẩn bị này, mỗi nguồn đạt một trăm nghìn train, hai mươi nghìn validation và năm mươi nghìn test. Sau đó phần train và validation của mỗi nguồn mới được chia đôi cho hai client, mỗi client năm mươi nghìn train và mười nghìn validation. Đây là các subset, không phải toàn bộ benchmark. Mất cân bằng còn lại được phản ánh trong class weight ở bước huấn luyện.
+Từ các tập đã tách, mỗi nguồn em lấy một subset cố định: một trăm nghìn train, hai mươi nghìn validation, năm mươi nghìn test, lấy mẫu thật và không nhân bản. Train đặt sàn cho mỗi lớp rồi chia phần còn lại theo tỷ lệ gốc; validation và test giữ tỷ lệ tự nhiên. Nhìn thanh màu thấy ngay hai nguồn lệch nhãn rất mạnh: CIC không có lớp OTHER_ATTACK, còn UNSW chỉ có khoảng mười phần trăm DoS, và em giữ toàn bộ 9.811 mẫu DoS thật. Sau đó train và validation của mỗi nguồn được chia cho hai client. Em không chia theo giao thức mà chia theo nhãn gốc: trong từng nhãn như DrDoS_NTP hay Exploits, các dòng được xáo bằng seed rồi chia lần lượt cho client 1, client 2, client 1, client 2. Mục đích là hai client cùng nguồn có cùng phân bố nhãn, mỗi nhãn lệch tối đa một mẫu, kể cả nhãn rất hiếm như WebDDoS, và mỗi dòng chỉ thuộc đúng một client. Như vậy khác biệt dữ liệu thật trong bài nằm giữa CIC và UNSW, không nằm giữa hai client cùng nguồn. Test không chia theo client mà giữ theo nguồn.
 
-**Chỉ vào hình:** Đọc hàng UNSW DOS_DDOS và tổng mẫu từng cột; nhấn mạnh không có augmentation.
+**Chỉ vào hình:** Chỉ dải cơ chế phía trên (subset → chia lần lượt 1, 2 → 2 client), rồi thanh màu CIC/UNSW (thiếu OTHER_ATTACK, ít DoS), cuối cùng dòng 'lệch tối đa 1 mẫu/nhãn' và ô Mục đích.
 
-**Chuyển ý:** Từ các trường cơ sở của những mẫu đã chọn, em xây dựng vector đặc trưng.
+**Chuyển ý:** Dữ liệu đã nằm ở từng client; tiếp theo em xây dựng vector đặc trưng cho mỗi flow.
 
-**Nguồn:** data_paper_multi_4c/main/sampling_report.md; fl_ddos/multidataset_sampling.py
+**Nếu thầy hỏi:** Subset không phải toàn bộ benchmark; mất cân bằng còn lại bù bằng class weight trong loss, không sinh thêm mẫu. Chia client là stratified round-robin theo original_label, seed 42, theo từng dòng: mỗi dòng thuộc đúng một client, nhưng hai flow có cùng vector đo (cùng fingerprint) vẫn có thể nằm ở hai client; điều này không gây rò rỉ vì cả hai đều là train, ràng buộc fingerprint đã áp ở ranh giới train/validation. Không tạo non-IID trong cùng nguồn (theo giao thức hay Dirichlet) vì mục tiêu là đo tác động của khác biệt giữa hai nguồn thật. Test không chia theo client; cùng một checkpoint toàn cục được chấm trên test của từng nguồn.
 
-## 08 · Tám trường cơ sở tạo thành 23 cột đầu vào
+**Nguồn:** data_paper_multi_4c/main/sampling_report.md; fl_ddos/multidataset_prep.py: choose_subsets, split_shards, client_frames; configs/multidataset.json: clients, client_split; data_paper_multi_4c/main/dataset_manifest.json
+
+## 07 · 8 trường cơ sở → 23 cột đầu vào
 
 **Giai đoạn:** Xây dựng đặc trưng · **Trạng thái:** Đang bật
 
-**Thông điệp:** Bổ sung tốc độ, tỷ lệ và kích thước gói để biểu diễn flow từ nhiều góc độ.
+**Thông điệp:** Giữ 7 trường số, tạo thêm 10 đặc trưng; giao thức và cờ duration thành 6 cột cố định.
 
 **Mục tiêu:** Cho thấy nguồn gốc từng nhóm đặc trưng và tách cột cố định khỏi cột được DAS lọc.
 
 **Nội dung trên slide:**
 
-- 17 cột liên tục: lượng, tốc độ, tỷ lệ, kích thước và IAT
-- 4 cột one-hot giao thức
-- 2 cờ duration_missing và duration_zero
+- 7 trường số giữ nguyên + 10 đặc trưng tạo thêm = 17 cột liên tục
+- Tạo thêm: tổng, tốc độ, tỷ lệ chiều về, kích thước gói trung bình
+- 6 cột cố định: 4 one-hot giao thức + duration_missing + duration_zero
 
 **Lời trình bày:**
 
-Tám trường canonical chưa phải vector cuối cùng. Từ số gói và byte theo hai chiều, hệ thống tạo tổng số gói, tổng byte, tốc độ theo giây, kích thước gói trung bình và các tỷ lệ theo chiều. Kết quả có mười bảy cột liên tục. Giao thức được one-hot thành bốn cột, và hai cờ bổ sung cho biết duration bị thiếu hoặc bằng không. Sáu cột cố định này không được DAS chọn lọc như nhóm liên tục. Những phép tạo đặc trưng là phép tính theo từng dòng và không học tham số từ validation hoặc test. Thứ tự cột được lưu trong metadata để mọi client và checkpoint dùng cùng một vector.
+Từ tám trường cơ sở, bảy trường số được giữ nguyên. Em tạo thêm mười đặc trưng chia thành bốn nhóm: tổng hai chiều, tốc độ theo giây, tỷ lệ chiều về và kích thước gói trung bình; cộng lại thành mười bảy cột liên tục. Trường giao thức được one-hot thành bốn cột, thêm hai cờ cho duration thiếu hoặc bằng không, thành sáu cột cố định. Tổng cộng hai mươi ba đầu vào.
 
-**Chỉ vào hình:** Theo sơ đồ 8 → 17 + 6 → 23, chỉ các nhóm đặc trưng có chung nguồn đo.
+**Chỉ vào hình:** Đi từ trái sang phải: 7 giữ nguyên → 10 tạo thêm theo 4 nhóm → 6 cố định, rồi đọc dải tổng ở dưới.
 
-**Chuyển ý:** Một ví dụ số sẽ làm rõ cách các đặc trưng mới được tính.
+**Chuyển ý:** Các đặc trưng này có thang giá trị rất khác nhau, nên bước tiếp theo là chuẩn hóa.
+
+**Nếu thầy hỏi:** Các phép tính làm theo từng dòng, không học tham số nên không gây rò rỉ giữa train và test. Khi mẫu số bằng 0 hoặc duration thiếu, đặc trưng tương ứng là missing chứ không gán 0. Sáu cột cố định không đi qua DAS.
 
 **Nguồn:** fl_ddos/multidataset_prep.py: CONTINUOUS, FIXED, derive
 
-## 09 · Một flow, nhiều cách nhìn về hành vi mạng
-
-**Giai đoạn:** Xây dựng đặc trưng · **Trạng thái:** Đang bật
-
-**Thông điệp:** Ví dụ minh họa giúp kiểm tra ý nghĩa phép tính và các trường hợp mẫu số không hợp lệ.
-
-**Mục tiêu:** Giải thích công thức bằng dữ liệu giả định và cách xử lý missing.
-
-**Nội dung trên slide:**
-
-- Ví dụ: duration 2 s, 8 gói đi, 2 gói về
-- Tổng 10 gói → 5 gói/s
-- Duration = 0: rate không xác định, cờ duration_zero = 1
-
-**Lời trình bày:**
-
-Em dùng một flow giả định để minh họa, không phải mẫu đo của thí nghiệm. Flow kéo dài hai giây, có tám gói đi, hai gói về, tám trăm byte đi và bốn trăm byte về. Tổng là mười gói và một nghìn hai trăm byte, nên tốc độ là năm gói mỗi giây và sáu trăm byte mỗi giây. Kích thước gói đi trung bình là một trăm byte, tỷ lệ gói về là hai mươi phần trăm. Nếu thời lượng bằng không, tốc độ không được coi là không mà là thiếu, đồng thời duration_zero được bật. Nếu số gói một chiều bằng không, kích thước trung bình chiều đó cũng không xác định. Nút chuyển ví dụ cho thấy những trường hợp này.
-
-**Chỉ vào hình:** Bấm lần lượt flow hợp lệ, duration bằng 0 và chiều về không có gói.
-
-**Chuyển ý:** Các giá trị tính được vẫn có thể rất khác thang đo, nên cần bước chuẩn hóa.
-
-**Nguồn:** fl_ddos/multidataset_prep.py: derive; Ví dụ giả định, không dùng làm số liệu kết quả
-
-## 10 · log1p nén đuôi lớn của giá trị
+## 08 · Bước 1 · Biến đổi log1p
 
 **Giai đoạn:** Chuẩn hóa dữ liệu · **Trạng thái:** Đang bật
 
-**Thông điệp:** Biến đổi ln(1 + x) giữ thứ tự giá trị không âm và giảm khoảng cách ở vùng rất lớn.
+**Thông điệp:** Mỗi giá trị x của 17 cột liên tục được thay bằng ln(1 + x) để kéo các giá trị rất lớn về gần phần còn lại.
 
-**Mục tiêu:** Giải thích tác dụng log1p và cho thấy sự thay đổi phân bố trên dữ liệu train.
+**Mục tiêu:** Nói rõ công thức bước 1, áp cho những cột nào, và minh họa bằng một cột thật.
 
 **Nội dung trên slide:**
 
-- Ví dụ: 0 → 0; 999 → 6,91; 999.999 → 13,82
-- Giá trị không hữu hạn hoặc âm được coi là missing
-- Histogram lấy từ 200.000 mẫu train đã chọn
+- Công thức: x′ = ln(1 + x); áp cho cả 17 cột liên tục, 6 cột 0/1 giữ nguyên
+- x âm hoặc không hữu hạn → missing
+- Ví dụ trên duration_s: 0–120 giây thành 0–4,8
 
 **Lời trình bày:**
 
-Các đặc trưng mạng thường có nhiều giá trị nhỏ nhưng một số flow rất lớn. Hàm log1p đưa giá trị không âm x về log tự nhiên của một cộng x, nhờ vậy những chênh lệch lớn được nén lại. Các con số bên trái là ví dụ toán học. Hai histogram bên phải mô tả duration của hai trăm nghìn mẫu train đã chọn. Do artifact lưu dữ liệu sau AFN, phân bố trước và sau log được tái dựng bằng tham số chuẩn hóa đã lưu; có sai số float32 và được ghi rõ trên hình. Hình này không lấy từ test và không được xem là kết quả cải thiện của mô hình. Sau log, em tiếp tục z-score theo giao thức.
+Chuẩn hóa gồm hai bước. Bước một là biến đổi log1p: mỗi giá trị x của cả mười bảy cột liên tục được thay bằng logarit tự nhiên của một cộng x. Dùng một cộng x để giá trị không vẫn ra không. Sáu cột cố định là 0 hoặc 1 nên giữ nguyên; giá trị âm hoặc vô hạn được coi là missing. Lý do là dữ liệu mạng có đuôi rất dài: phần lớn flow nhỏ, một số flow cực lớn. Hình lấy cột duration làm ví dụ: trước log, gần như mọi thứ dồn vào cột đầu và trục kéo tới một trăm hai mươi giây; sau log, trục chỉ còn đến khoảng 4,8 và các flow dài hơn tách ra thành nhiều cột. Cột đầu vẫn cao vì nhiều flow có duration gần không, và log của một cộng không vẫn bằng không; log1p chỉ nén đuôi lớn chứ không làm mất đỉnh ở không.
 
-**Chỉ vào hình:** So sánh trục ngang và mức tập trung của hai histogram; mỗi hình dùng miền giá trị riêng.
+**Chỉ vào hình:** Chỉ công thức và dòng '17 cột liên tục', rồi so hai histogram: trục 0–120 thành 0–4,8; giải thích cột đầu vẫn cao.
 
-**Chuyển ý:** log1p nén giá trị lớn, còn AFN đưa các nhóm giao thức về thang thống kê phù hợp.
+**Chuyển ý:** Sau khi nén, các giao thức vẫn ở mức khác nhau; bước hai đưa mỗi flow về thang của chính giao thức của nó.
+
+**Nếu thầy hỏi:** Histogram dựng lại từ 200.000 mẫu train đã lưu sau AFN bằng tham số chuẩn hóa đã lưu nên có sai số float32; không lấy từ test.
 
 **Nguồn:** fl_ddos/multidataset_prep.py: log1p_valid; data_paper_multi_4c/main/prep_params.json và train client_1..4.parquet
 
-## 11 · AFN học thống kê từ train theo giao thức
+## 09 · Bước 2 · Chuẩn hóa z-score theo giao thức (AFN)
 
 **Giai đoạn:** Chuẩn hóa dữ liệu · **Trạng thái:** Đang bật
 
-**Thông điệp:** Bốn client góp thống kê để có mean/std chung; validation và test chỉ áp dụng lại.
+**Thông điệp:** Mỗi cột được trừ trung bình μ và chia độ lệch chuẩn σ của chính giao thức của flow; μ, σ chỉ học từ train của 4 client.
 
-**Mục tiêu:** Mô tả chuẩn hóa liên kết và ranh giới fit/transform.
+**Mục tiêu:** Nói rõ công thức z-score, nhóm theo giao thức để làm gì, và chứng minh bằng ví dụ số thật.
 
 **Nội dung trên slide:**
 
-- Client tính số quan sát, tổng và tổng bình phương hợp lệ
-- Gộp thống kê theo TCP / UDP / ICMP / OTHER
-- Missing sau z-score → 0; nhóm thiếu dùng thống kê train dự phòng
+- Tách train theo TCP / UDP / ICMP / OTHER; tính μ, σ cho từng cột trong từng nhóm
+- Client gửi n, Σx, Σx²; server cộng lại thành μ, σ, không gửi dòng dữ liệu
+- z = (x′ − μ_nhóm) / σ_nhóm; ví dụ 25 gói: TCP z ≈ 0, UDP z ≈ +0,87
+- Val/test áp lại; σ ≈ 0 → 1; nhóm thiếu → μ, σ chung; missing → 0
 
 **Lời trình bày:**
 
-AFN chuẩn hóa từng đặc trưng sau log theo nhóm giao thức. Mỗi client tính số quan sát hợp lệ, tổng và tổng bình phương cho từng nhóm. Việc gộp các thống kê này cho phép tính mean và độ lệch chuẩn chung mà không cần gửi toàn bộ dòng dữ liệu trong thiết kế thuật toán. Các phép tính hiện được mô phỏng từ artifact train. Một giá trị z được tính bằng x trừ mean rồi chia scale. Nếu độ lệch chuẩn gần không, scale dùng một; nếu thiếu thống kê nhóm, dùng tham số train toàn cục dự phòng. Missing được đưa về không sau z-score. Mọi tham số được cố định trước khi biến đổi validation và test.
+Bước hai là chuẩn hóa z-score, em gọi là AFN, tức chuẩn hóa đặc trưng thích nghi theo nhóm. Công thức quen thuộc: z bằng x trừ trung bình rồi chia độ lệch chuẩn. Điểm khác là trung bình và độ lệch chuẩn không tính chung cho mọi flow, mà tính riêng cho từng giao thức TCP, UDP, ICMP, OTHER. Vì sao? Bên phải là ví dụ thật từ tham số đã học: một flow có hai mươi lăm gói. Flow TCP trung bình khoảng hai mươi lăm gói, nên với TCP flow này cho z gần không, tức bình thường. Flow UDP trung bình chỉ khoảng tám gói, nên cùng hai mươi lăm gói, với UDP z bằng cộng 0,87, tức nhiều hơn mức thường. Nếu không tách giao thức, tức dùng một cặp trung bình và độ lệch chuẩn cho mọi flow, hai mức này bị trộn lẫn. Bảng phía dưới cho thấy điều này không chỉ đúng với số gói: trên train, flow TCP điển hình khoảng hai mươi lăm gói và kéo dài khoảng một giây, UDP khoảng tám gói nhưng tốc độ byte cao hơn nhiều; mỗi giao thức có một mức bình thường riêng. Về cách tính trong học liên kết: mỗi client chỉ gửi số mẫu, tổng và tổng bình phương theo từng nhóm; server cộng lại là ra trung bình và độ lệch chuẩn, không cần gửi dòng dữ liệu nào. Các tham số này chỉ học từ train; validation và test chỉ áp lại. Nếu độ lệch chuẩn gần không thì chia cho một, nhóm không có mẫu thì dùng tham số chung, và ô missing được đặt bằng không, tức bằng mức trung bình.
 
-**Chỉ vào hình:** Chỉ mũi tên thống kê, công thức z-score, và khóa fit chỉ trên train.
+**Chỉ vào hình:** Đọc ba bước bên trái, rồi chỉ ví dụ bên phải: cùng 25 gói, TCP z ≈ 0 còn UDP z ≈ +0,87; cuối cùng dòng 'μ, σ chỉ học từ train'.
 
 **Chuyển ý:** Khi các giá trị đã chuẩn hóa, em lựa chọn phần thông tin cần đưa vào mô hình.
 
@@ -308,7 +266,7 @@ AFN chuẩn hóa từng đặc trưng sau log theo nhóm giao thức. Mỗi clie
 
 **Nguồn:** fl_ddos/multidataset_prep.py: afn_stats, aggregate_afn, apply_afn
 
-## 12 · DAS giữ thông tin liên quan, lọc phần dư thừa
+## 10 · DAS giữ thông tin liên quan, lọc phần dư thừa
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
@@ -332,7 +290,7 @@ DAS trong pipeline gồm hai phần. CRA đo liên quan bằng bình phương t�
 
 **Nguồn:** fl_ddos/multidataset_prep.py: das_stats, das_relevance, das_select
 
-## 13 · Từ tiêu chí đến quyết định giữ hoặc loại
+## 11 · Từ tiêu chí đến quyết định giữ hoặc loại
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
@@ -356,7 +314,7 @@ Bảng này lấy trực tiếp từ feature_selection.csv. bwd_packets_s có re
 
 **Nguồn:** data_paper_multi_4c/main/feature_selection.csv
 
-## 14 · ALL và DAS khác nhau ở bộ đầu vào
+## 12 · ALL và DAS khác nhau ở bộ đầu vào
 
 **Giai đoạn:** Lựa chọn đặc trưng · **Trạng thái:** Đang bật
 
@@ -380,7 +338,7 @@ Nhánh ALL giữ toàn bộ mười bảy cột liên tục hợp lệ, còn DAS
 
 **Nguồn:** data_paper_multi_4c/main/features.json; data_paper_multi_4c/main_all/features.json
 
-## 15 · ResVGG-SwinNet học trên biểu diễn của flow
+## 13 · ResVGG-SwinNet học trên biểu diễn của flow
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -404,7 +362,7 @@ Mô hình nhận vector mười tám hoặc hai mươi ba đặc trưng tùy c�
 
 **Nguồn:** fl_ddos/models.py: ResVGGSwinNet
 
-## 16 · Theo dõi một lượt forward
+## 14 · Theo dõi một lượt forward
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -428,7 +386,7 @@ Với batch có B flow và F đặc trưng, đầu vào có hình dạng B nhân
 
 **Nguồn:** fl_ddos/models.py: ResVGGSwinNet.forward; fl_ddos/task.py: train, predict
 
-## 17 · Local, centralized và FL tổ chức việc học ra sao?
+## 15 · Local, centralized và FL tổ chức việc học ra sao?
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -452,7 +410,7 @@ Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học d�
 
 **Nguồn:** baselines/multidataset_baselines.py; fl_ddos/multidataset_server.py; https://proceedings.mlr.press/v54/mcmahan17a.html
 
-## 18 · Một vòng FedAvg: gửi, học, nhận, tổng hợp
+## 16 · Một vòng FedAvg: gửi, học, nhận, tổng hợp
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -476,7 +434,7 @@ Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học d�
 
 **Nguồn:** fl_ddos/multidataset_server.py; fl_ddos/task.py: train; configs/multidataset.json: fl
 
-## 19 · Cố định đối chứng, chọn mô hình bằng validation
+## 17 · Cố định đối chứng, chọn mô hình bằng validation
 
 **Giai đoạn:** Xây dựng & huấn luyện · **Trạng thái:** Đang bật
 
@@ -500,7 +458,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json; results_modal_multidataset/20261122_235344_298853/status_snapshot.json; baselines/multidataset_baselines.py
 
-## 20 · Ba câu hỏi đánh giá, ba cách đọc kết quả
+## 18 · Ba câu hỏi đánh giá, ba cách đọc kết quả
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -524,7 +482,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** fl_ddos/multidataset_eval.py: source_metrics, binary_block, evaluate_checkpoint
 
-## 21 · Học liên kết chỉ vượt local rõ rệt khi dùng FedProx
+## 19 · Học liên kết chỉ vượt local rõ rệt khi dùng FedProx
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -550,7 +508,7 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 22 · Local gặp khó khi chuyển sang nguồn chưa học
+## 20 · Local gặp khó khi chuyển sang nguồn chưa học
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -574,7 +532,7 @@ Mỗi hàng là một mô hình, mỗi cột là một nguồn test. Hai local C
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 23 · Với 4 client, DAS không nâng F1 tổng hợp
+## 21 · Với 4 client, DAS không nâng F1 tổng hợp
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -600,7 +558,7 @@ Mỗi hàng là một mô hình, mỗi cột là một nguồn test. Hai local C
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
 
-## 24 · DAS giảm F1, đổi lại ít báo động giả hơn
+## 22 · DAS giảm F1, đổi lại ít báo động giả hơn
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -624,7 +582,7 @@ DAS không tốt hơn trên mọi chỉ số, nhưng cũng không kém trên m�
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
 
-## 25 · Chung đầu vào chưa làm hai nguồn học giống nhau
+## 23 · Chung đầu vào chưa làm hai nguồn học giống nhau
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -650,7 +608,7 @@ Biểu đồ hiển thị đủ ba mươi vòng validation, đường CIC và UN
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/fl/*_rounds.csv; results_modal_multidataset/20261122_152058_5ec64a/main/all/fl/*_rounds.csv
 
-## 26 · FedProx thêm một điểm neo cho quá trình học cục bộ
+## 24 · FedProx thêm một điểm neo cho quá trình học cục bộ
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -674,7 +632,7 @@ FedProx thay đổi mục tiêu học tại client bằng cách cộng một s�
 
 **Nguồn:** fl_ddos/task.py: train; fl_ddos/multidataset_server.py; https://arxiv.org/abs/1812.06127
 
-## 27 · FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng
+## 25 · FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -700,7 +658,7 @@ Với cùng bộ DAS và bốn client, FedProx đạt F1-macro trung bình 56,99
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 28 · Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp
+## 26 · Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
@@ -724,7 +682,7 @@ Trong ma trận, mỗi hàng là nhãn thật và mỗi cột là nhãn dự đo
 
 **Nguồn:** results_modal_multidataset/*/main/*/confusion.csv; results_modal_multidataset/*/main/*/per_class.csv
 
-## 29 · Đóng góp nằm ở cả pipeline và cách kiểm chứng
+## 27 · Đóng góp nằm ở cả pipeline và cách kiểm chứng
 
 **Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
 
@@ -748,7 +706,7 @@ Bài làm xây dựng được một pipeline từ hai nguồn dữ liệu khác
 
 **Nguồn:** data_paper_multi_4c/main/quality_report.json; results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## 30 · Từ kết quả thực nghiệm đến bước phát triển tiếp
+## 28 · Từ kết quả thực nghiệm đến bước phát triển tiếp
 
 **Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
 
