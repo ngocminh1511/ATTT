@@ -2,7 +2,7 @@
 
 Mở **index.html** bằng trình duyệt. File này chứa giao diện, nội dung dành cho người nghe, số liệu và SVG; có thể chép riêng sang máy khác và dùng offline. Không cần server, Node, CDN hay raw dataset để trình chiếu. Kịch bản lời nói chỉ nằm trong **kich_ban.md**.
 
-Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 30 trang chính (00–29) và 6 trang phụ lục (A1–A6).
+Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 26 trang chính (00–25) và 6 trang phụ lục (A1–A6).
 
 Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải thích lớn. Trang đầu có hình minh họa mạng học liên kết và pipeline SVG với các gói cập nhật chuyển động. Toàn bộ slide chính dùng sơ đồ, ví dụ trực quan hoặc biểu đồ; bảng tham chiếu chi tiết nằm ở phụ lục. Hiệu ứng xuất hiện, đường truyền, bộ lọc và đường học dùng CSS/SVG; tự giảm chuyển động theo thiết lập hệ điều hành.
 
@@ -63,13 +63,8 @@ node presentation/check.cjs
 
 Không thay đổi mã chuẩn bị dữ liệu hoặc huấn luyện của dự án. Không có hosting hoặc dịch vụ bên ngoài.
 
-## Trang demo hai node (`demo.html`)
+## Demo trực tiếp hai máy
 
-Trang riêng, không nằm trong chuỗi slide: `http://127.0.0.1:5500/presentation/demo.html` (Live Server) hoặc mở trực tiếp file. Hàng đợi gồm 30 flow thật trong tập test (15 CIC, 15 UNSW, khoảng 1/4 là ca mô hình đoán sai); kéo thả hoặc ▲▼ để sắp thứ tự. **Bắn 1 flow / Bắn hết**: flow bay sang node của nguồn dữ liệu (A = CIC · client 1–2, B = UNSW · client 3–4; test giữ theo nguồn nên node theo nguồn) và rơi vào stack của node, kèm lớp dự đoán, xác suất và đúng/sai. Đổi mô hình FedProx / FedAvg ở góc trên.
-
-Xác suất được tính sẵn từ best checkpoint FedProx / FedAvg DAS của run 4 client, trang không chạy mô hình. Dữ liệu: `data/demo.json`; giao diện: `src/demo.html`.
-
-```powershell
-.\.venv\Scripts\python.exe presentation/make_demo.py               # lấy lại 30 flow + xác suất (cần torch, raw data)
-python presentation/make_demo.py --html-only                       # chỉ dựng lại demo.html sau khi sửa src/demo.html
-```
+Demo cũ (`demo.html`) đã bỏ. Demo mới nằm ngoài thư mục này, ở `../demo_live/`:
+máy server chạy web có model gác cửa, máy attack bắn lưu lượng theo 3 pha. Xem
+[`../demo_live/KICH_BAN_DEMO.md`](../demo_live/KICH_BAN_DEMO.md).
