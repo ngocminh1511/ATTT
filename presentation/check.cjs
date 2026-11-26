@@ -16,6 +16,10 @@ check('26 pages, 9 stages, no appendix',()=>{
   assert.equal(deck.slides.length,26);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,0);
   assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,4,1]);
 });
+check('every slide view has a drawing in visuals.js',()=>{
+  const src=fs.readFileSync(path.join(base,'src/visuals.js'),'utf8'),special=['home','roadmap','thanks','demo-arch'];
+  for(const s of content.slides)if(!special.includes(s.view))assert.ok(src.includes(`case '${s.view}'`),`${s.id}: thiếu case '${s.view}' trong visuals.js`);
+});
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
     const html=deck.render(slide.id);

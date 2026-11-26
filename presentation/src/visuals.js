@@ -487,6 +487,14 @@
           const cards=series.map(([k,name])=>`<div class="rv-card${focus===k?' on':''}" style="--c:${colors[k]}"><b>${name}</b><span class="pro">✓ ${notes[k][0]}</span><span class="con">✗ ${notes[k][1]}</span></div>`).join('');
           return controls(select('focus','Làm nổi bật',[['all-series','Tất cả phương pháp'],...series],focus))+`<div class="rv-wrap"><div class="rv-chart">${frame(body,'Radar so sánh các phương pháp trên 6 chỉ số',660,430)}</div><div class="rv-cards">${cards}</div></div>`+note('Trung bình hai nguồn test · “Ít báo nhầm” = 1 − FAR mọi tấn công · càng ra ngoài càng tốt.');
         }
+        case 'prox-mechanism':{
+          let body=tx(600,38,'L(w) = L_local(w) + μ/2 · ‖w − w_global‖²','s-formula','text-anchor="middle"');
+          body+=circle(600,205,111,'#edf6f1','stroke="#8ab7a0" stroke-dasharray="7 8" stroke-width="2"')+circle(600,205,10,C.green)+tx(600,249,'w_global','s-label','text-anchor="middle"');
+          ['M600,205L272,104','M600,205L930,105'].forEach(d=>body+=edge(d,C.gray,true));
+          ['M600,205L536,145','M600,205L674,150'].forEach(d=>body+=edge(d,C.blue,true)+pulse(d,C.blue));
+          body+=lines(210,154,['Client A','hướng cục bộ'],'s-label',30,'text-anchor="middle"')+lines(1000,154,['Client B','hướng cục bộ'],'s-label',30,'text-anchor="middle"')+tx(600,351,'Neo cập nhật gần mô hình đầu vòng · μ = 0,1','s-emphasis','text-anchor="middle"');
+          return frame(body,'Minh họa trực giác số hạng proximal, không phải quỹ đạo đo')+note('Minh họa cơ chế. Server vẫn FedAvg; số hạng proximal không phải bộ lọc chống đầu độc.');
+        }
         case 'prox-results':return comparison(['das','central','prox'],metric,source)+`<div class="result-observation"><strong>${p(row('prox',source)[metric])}</strong><span>${metricInfo[metric]} · FedProx</span><b>${n((row('prox',source)[metric]-row('das',source)[metric])*100,2)} điểm phần trăm so với FedAvg</b></div>`;
         case 'errors':return confusion(state);
         case 'contributions':{
