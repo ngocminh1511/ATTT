@@ -457,13 +457,12 @@ Local-only tạo bốn mô hình riêng, mỗi mô hình chỉ được học d�
 - 30 vòng × 5 epoch cục bộ; Adam, lr 0,001
 - Batch 64, dropout 0,3, weighted cross-entropy
 - 50.000 mẫu/client → trọng số tổng hợp 25% mỗi client
-- Class weight: nghịch đảo tần suất lớp tại client, giới hạn [0,1; 10], lớp vắng = 0
 
 **Lời trình bày:**
 
-Đầu vòng, server gửi cùng một mô hình toàn cục đến bốn client. Mỗi client huấn luyện năm epoch trên train của mình, sử dụng Adam và loss có trọng số lớp. Sau đó client gửi trọng số cùng số mẫu, server kiểm tra đủ bốn PID và tổng hợp theo số mẫu thực. Vì bốn client cùng có năm mươi nghìn mẫu train, hệ số ở phép trung bình là một phần tư cho mỗi client; tính theo nguồn thì CIC và UNSW vẫn mỗi bên một nửa. Đây là trọng số tổng hợp mô hình, khác với class weight trong loss ở dải phía dưới: class weight là nghịch đảo tần suất lớp tại từng client, nên lớp càng ít mẫu càng được nhân trọng số lớn. Ví dụ ở UNSW, DoS chỉ chiếm khoảng mười phần trăm nên có trọng số khoảng 2,05, còn ở CIC lớp OTHER_ATTACK không có nên trọng số bằng không. Quy trình lặp ba mươi vòng; sau mỗi lần tổng hợp, mô hình được đánh giá trên validation của bốn client và điểm chọn mô hình là trung bình theo nguồn. Các nút trên hình lần lượt mở từng bước để dễ theo dõi luồng.
+Đầu vòng, server gửi cùng một mô hình toàn cục đến bốn client. Mỗi client huấn luyện năm epoch trên train của mình, sử dụng Adam và loss có trọng số lớp. Sau đó client gửi trọng số cùng số mẫu, server kiểm tra đủ bốn PID và tổng hợp theo số mẫu thực. Vì bốn client cùng có năm mươi nghìn mẫu train, hệ số ở phép trung bình là một phần tư cho mỗi client; tính theo nguồn thì CIC và UNSW vẫn mỗi bên một nửa. Đây là trọng số tổng hợp mô hình, khác với class weight trong loss: class weight là nghịch đảo tần suất lớp tại từng client, nên lớp càng ít mẫu càng được nhân trọng số lớn. Ví dụ ở UNSW, DoS chỉ chiếm khoảng mười phần trăm nên có trọng số khoảng 2,05, còn ở CIC lớp OTHER_ATTACK không có nên trọng số bằng không. Quy trình lặp ba mươi vòng; sau mỗi lần tổng hợp, mô hình được đánh giá trên validation của bốn client và điểm chọn mô hình là trung bình theo nguồn. Các nút trên hình lần lượt mở từng bước để dễ theo dõi luồng.
 
-**Chỉ vào hình:** Bấm các bước 1–4; đọc công thức FedAvg và phân biệt với bảng class weight.
+**Chỉ vào hình:** Bấm lần lượt các bước 1 → 4 trên pipeline; ở bước 4 đọc công thức trung bình trọng số.
 
 **Chuyển ý:** FedAvg là cách tổng hợp cơ bản; FedProx sửa phần học tại client để xử lý dữ liệu khác phân phối.
 

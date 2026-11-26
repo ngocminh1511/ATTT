@@ -149,7 +149,7 @@ check('mounted next/back/hash, selectors, menu, keyboard and loop step',()=>{
   key('Escape');location.hash='#train-round';
   const action={dataset:{action:'step',value:'3'}};
   listeners.click({target:{closest:selector=>selector==='[data-action]'?action:null}});
-  assert.ok(elements.main.innerHTML.includes('BƯỚC 4 / 4'));
+  assert.ok(elements.main.innerHTML.includes('data-value="3" class="active" aria-current="step"'));
   location.hash='#clean-schema';
   const phaseAction={dataset:{action:'phase',value:'1'}};
   listeners.click({target:{closest:selector=>selector==='[data-action]'?phaseAction:null}});

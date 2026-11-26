@@ -412,12 +412,9 @@
           if(s===0||s===2){const ends=[[150,95],[300,215],[1050,95],[900,215]],hub=[[525,135],[530,185],[675,135],[670,185]];ends.forEach(([x,yy],i)=>{const [hx,hy]=hub[i],d=s===0?`M${hx},${hy}L${x},${yy}`:`M${x},${yy}L${hx},${hy}`;body+=edge(d,i<2?C.blue:C.coral,true)+pulse(d,i<2?C.blue:C.coral,-i*.5);});}
           if(s===1){cx.forEach(([x,yy],i)=>body+=circle(x,yy,50,'none',`stroke="${i<2?'#2459c4':'#c34d35'}" stroke-width="3" stroke-dasharray="10 8" class="spin-ring"`));}
           if(s===3)body+=tx(600,48,'w mới = 0,25 (w₁ + w₂ + w₃ + w₄)','s-formula','text-anchor="middle"');
-          return `<div class="phase-controls">${steps.map((t,i)=>`<button data-action="step" data-value="${i}" aria-pressed="${s===i}"><span>${i+1}</span>${t}</button>`).join('')}</div><span class="round-step-label">BƯỚC ${s+1} / 4</span>`+frame(body,'Một vòng FedAvg tương tác')+`<div class="criteria-strip"><span><b>30</b> vòng</span><span><b>5</b> epoch / vòng</span><span>Adam · lr <b>0,001</b></span><span>batch <b>64</b> · dropout <b>0,3</b></span></div>`+(()=>{
-            // Class weight trong loss (khác trọng số tổng hợp 25%): nghịch đảo tần suất lớp tại client, lớp vắng = 0.
-            const cw=data.class_weights||{},short={BENIGN:'BENIGN',DOS_DDOS:'DoS/DDoS',OTHER_ATTACK:'OTHER'};
-            const one=src=>{const c=data.clients.find(x=>x.dataset_id===src),w=cw[`client_${c.client}`]||[];
-              return `<div><b>${src==='cicddos2019'?'CIC · client 1, 2':'UNSW · client 3, 4'}</b>${data.classes.map((k,i)=>`<span>${short[k]} <strong>${w[i]?n(w[i],2):'—'}</strong></span>`).join('')}</div>`;};
-            return `<div class="cw-strip"><header>Class weight trong loss <small>lớp càng ít mẫu, trọng số càng cao · giới hạn [0,1; 10] · lớp vắng = 0</small></header>${data.sources.map(one).join('')}</div>`;})();
+          // Bốn bước của một vòng FL dạng pipeline 1 → 2 → 3 → 4 → (lặp 30 vòng); mỗi bước vẫn bấm được.
+          const pipe=`<ol class="round-pipe">${steps.map((t,i)=>`${i?'<li class="rp-arrow" aria-hidden="true">→</li>':''}<li><button data-action="step" data-value="${i}" class="${i<s?'done':i===s?'active':''}"${i===s?' aria-current="step"':''}><span>${i+1}</span>${t}</button></li>`).join('')}<li class="rp-loop">↺ lặp lại · 30 vòng</li></ol>`;
+          return pipe+frame(body,'Một vòng FedAvg tương tác')+`<div class="criteria-strip"><span><b>30</b> vòng</span><span><b>5</b> epoch / vòng</span><span>Adam · lr <b>0,001</b></span><span>batch <b>64</b> · dropout <b>0,3</b></span></div>`;
         }
         case 'experiments':{
           let body='';

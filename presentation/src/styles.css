@@ -262,10 +262,6 @@ svg text{font-family:Arial,"Segoe UI",sans-serif;fill:#17263c}.s-body{font-size:
 .th-card header span em{font-style:normal;font-weight:500;font-size:.78em;color:#2459c4}
 .th-card header span small{display:block;font-size:.72em;font-weight:500;color:#5a6d86;margin-top:2px}
 .rk-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding-bottom:2vh}
-.cw-strip{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 26px;margin-top:8px;padding:8px 14px;border-radius:10px;background:#f4f7fc;font-size:clamp(12px,.95vw,15px);color:#3c536f}
-.cw-strip header{width:100%;font-weight:700;color:#17263c}.cw-strip header small{font-weight:400;color:#6b7c93;margin-left:8px}
-.cw-strip>div{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}.cw-strip>div>b{color:#17263c}
-.cw-strip strong{color:#1d467f;font-variant-numeric:tabular-nums}
 /* Trang bìa */
 .title-slide{flex:1;min-height:0;display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center}
 .ts-left{display:flex;flex-direction:column;gap:14px}
@@ -317,3 +313,10 @@ body.is-cover{grid-template-rows:0 minmax(0,1fr) 0}
 body.is-cover .topbar,body.is-cover .bottom-bar{display:none}
 body.is-cover #main{grid-row:1 / 4;max-width:none;width:100%;padding:14px}
 body.is-cover .hero{border-radius:16px}
+.round-pipe{list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.round-pipe button{display:flex;align-items:center;gap:8px;border:1.5px solid #ccd8e9;background:#fff;color:#3c536f;border-radius:999px;padding:6px 14px 6px 6px;font:inherit;font-size:clamp(13px,1vw,15px);cursor:pointer}
+.round-pipe button span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#e6edf8;color:#2a5bc8;font-weight:700;font-size:12px}
+.round-pipe button.done{border-color:#9db6e3;color:#263f61}.round-pipe button.done span{background:#9db6e3;color:#fff}
+.round-pipe button.active{border-color:#2a5bc8;background:#2a5bc8;color:#fff;font-weight:600}.round-pipe button.active span{background:#fff;color:#2a5bc8}
+.round-pipe .rp-arrow{color:#8ea0b8;font-size:20px}
+.round-pipe .rp-loop{margin-left:8px;color:#6b7c93;font-size:clamp(12px,.95vw,14px)}
