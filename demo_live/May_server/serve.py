@@ -306,6 +306,19 @@ tick(); setInterval(tick, 800);
 </script></body></html>"""
 
 
+def _lan_ip() -> str:
+    """IP LAN của máy này (UDP connect không gửi gói nào, chỉ để OS chọn card mạng)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "<IP-LAN>"
+    finally:
+        s.close()
+
+
 def main():
     global ENGINE
     ap = argparse.ArgumentParser()
@@ -322,8 +335,11 @@ def main():
     info = ENGINE.model_info()
     sizes = {t: len(ENGINE.pool[t]["both"]) for t in ENGINE.available_types()}
     print(f"OK. Model {info['name']} (vòng {info['round']}). Kho mẫu: {sizes}")
-    print(f"  Trang web  : http://{args.host}:{args.port}/           (?sample_type=benign|dos|other)")
-    print(f"  Dashboard  : http://{args.host}:{args.port}/dashboard")
+    local = "localhost" if args.host in ("0.0.0.0", "") else args.host
+    print(f"  Trang web  : http://{local}:{args.port}/           (?sample_type=benign|dos|other)")
+    print(f"  Dashboard  : http://{local}:{args.port}/dashboard")
+    if args.host in ("0.0.0.0", ""):
+        print(f"  Máy attack : http://{_lan_ip()}:{args.port}    (dùng cho --target)")
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     try:
         srv.serve_forever()
