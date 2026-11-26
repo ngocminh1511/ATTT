@@ -259,8 +259,8 @@ def validate_snapshot(data):
 
 def validate_content(content):
     slides, stages = content["slides"], content["stages"]
-    if len(stages) != 9 or len(slides) != 36:
-        raise ValueError("Cần 9 giai đoạn, 30 trang chính và 6 phụ lục")
+    if len(stages) != 8 or len(slides) != 24:
+        raise ValueError("Cần 8 giai đoạn và 24 trang")
     if len({s["id"] for s in slides}) != len(slides):
         raise ValueError("ID slide bị trùng")
     known = {s["id"] for s in stages} | {"home", "appendix"}
@@ -275,7 +275,7 @@ def validate_content(content):
 def script_markdown(content, data):
     lines = ["# Kịch bản thuyết trình — Học liên kết phát hiện tấn công mạng", "",
              "Sinh từ `src/slides.json`; chỉnh nguồn rồi chạy `python presentation/build.py`.", "",
-             "Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng → chuẩn hóa → DAS → huấn luyện → kết quả → kết luận.", "",
+             "Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng → chuẩn hóa → DAS → huấn luyện → kết quả.", "",
              "Các giá trị thực nghiệm: 4 client (CIC → 1, 2; UNSW → 3, 4), profile main, seed 0; F1 tổng hợp là trung bình đều F1-macro-present hai nguồn, trừ khi ghi khác.", ""]
     stage_names = {s["id"]: s["title"] for s in content["stages"]} | {"home": "Pipeline", "appendix": "Phụ lục"}
     for slide in content["slides"]:
@@ -334,4 +334,4 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true", help="Kiểm tra nội dung và dữ liệu, không ghi file")
     args = parser.parse_args()
     count = build(args.refresh_data, args.check)
-    print(f"OK: {count} trang (30 chính + 6 phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")
+    print(f"OK: {count} trang (không có phụ lục); {'kiểm tra' if args.check else 'đã tạo index.html và kich_ban.md'}")

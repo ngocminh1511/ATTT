@@ -37,7 +37,7 @@
   const select=(key,label,options,value)=>`<label class="chart-select"><span>${e(label)}</span><select data-control="${key}">${options.map(([k,s])=>`<option value="${e(k)}" ${k===value?'selected':''}>${e(s)}</option>`).join('')}</select></label>`;
   const controls=(...children)=>`<div class="chart-controls">${children.join('')}</div>`;
   const phases=(names,current=0)=>`<div class="phase-controls" role="group" aria-label="Các phần minh họa">${names.map((s,i)=>`<button data-action="phase" data-value="${i}" aria-pressed="${i===current}"><span>${String(i+1).padStart(2,'0')}</span>${e(s)}</button>`).join('')}</div>`;
-  const metricInfo={f1_macro_present:'F1-macro-present',dos_f1:'F1 DoS/DDoS',attack_f1:'F1 mọi tấn công',attack_recall:'Recall mọi tấn công',dos_recall:'Recall DoS/DDoS',attack_far_benign:'FAR mọi tấn công ↓',acc:'Accuracy',attack_roc_auc:'AUC mọi tấn công'};
+  const metricInfo={f1_macro_present:'F1 macro',dos_f1:'F1 DoS/DDoS',attack_f1:'F1 mọi tấn công',attack_recall:'Recall mọi tấn công',dos_recall:'Recall DoS/DDoS',attack_far_benign:'FAR mọi tấn công ↓',acc:'Accuracy',attack_roc_auc:'AUC mọi tấn công'};
   const sources={mean_over_sources:'Trung bình hai nguồn',cicddos2019:'CIC-DDoS2019',unsw_nb15:'UNSW-NB15',worst_source:'Kém nhất theo từng chỉ số',pooled_predictions:'Dự đoán gộp'};
   const labels={all:'FedAvg · ALL',das:'FedAvg · DAS',prox:'FedProx · DAS',central:'Centralized',local_c1:'Local · CIC #1',local_c2:'Local · CIC #2',local_c3:'Local · UNSW #3',local_c4:'Local · UNSW #4'};
   const colors={all:'#607187',das:C.blue,prox:C.green,central:C.purple,local_c1:C.coral,local_c2:'#e08a6f',local_c3:'#a07322',local_c4:'#c9a35a'};
@@ -102,19 +102,19 @@
       </div></section>`;
     }
     function roadmap(){
-      const positions=[[80,50],[340,50],[600,50],[860,50],[1120,50],[1120,210],[773,210],[427,210],[80,210]];
+      const positions=[[150,50],[450,50],[750,50],[1050,50],[1050,210],[750,210],[450,210],[150,210]];
       const names=[['Tổng quan','dữ liệu'],['Làm sạch','& đồng nhất'],['Phân chia','dữ liệu'],['Xây dựng','đặc trưng'],['Chuẩn hóa','dữ liệu'],['Lựa chọn','đặc trưng'],['Kiến trúc','& huấn luyện'],['Đánh giá','kết quả'],['Kết luận','& hướng đi']];
       let body='';
-      for(let i=0;i<8;i++){
+      for(let i=0;i<groups.length-1;i++){
         const [x,y]=positions[i],[nx,ny]=positions[i+1];
-        const d=i===4?`M${x},${y+40} C${x+80},${y+70} ${nx+80},${ny-70} ${nx},${ny-40}`:i<4?`M${x+48},${y} L${nx-48},${ny}`:`M${x-48},${y} L${nx+48},${ny}`;
+        const d=i===3?`M${x},${y+40} C${x+80},${y+70} ${nx+80},${ny-70} ${nx},${ny-40}`:i<3?`M${x+48},${y} L${nx-48},${ny}`:`M${x-48},${y} L${nx+48},${ny}`;
         body+=edge(d,'#b6c8e0',true);
       }
       groups.forEach(g=>{
         const i=content.stages.findIndex(s=>s.id===g.id),[x,y]=positions[i],kind=['data','clean','split','features','normalize','select','train','results','conclusion'][i];
         body+=`<a href="#${g.slides[0].id}" class="pipeline-stop" style="--order:${i}" aria-label="${e(g.title)}">${circle(x,y,39,i===7?'#e2efff':'#f1f5fb','class="stop-disc"')}${icon(kind,x-22,y-22,44,i===7?C.coral:C.blue)}${tx(x-54,y-35,String(i+1).padStart(2,'0'),'s-stage-index')}${lines(x,y+63,names[i],'s-pipeline-title',24,'text-anchor="middle"')}</a>`;
       });
-      return `<section class="roadmap"><header class="roadmap-head"><h1>Quy trình thực hiện</h1><span>9 giai đoạn</span></header><section class="pipeline-map">${frame(body,'Pipeline chín giai đoạn',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span></div></section>`;
+      return `<section class="roadmap"><header class="roadmap-head"><h1>Quy trình thực hiện</h1><span>${groups.length} giai đoạn</span></header><section class="pipeline-map">${frame(body,'Pipeline tám giai đoạn',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span></div></section>`;
     }
 
     function bars(keys,metric,source){
@@ -148,24 +148,24 @@
       return frame(body,`30 vòng validation ${labels[key]}`,1200,355)+`<div class="curve-readout"><label>Vòng <strong>${current.round}</strong><input type="range" min="1" max="30" value="${current.round}" data-control="round" aria-label="Vòng validation"></label><span style="--series:${C.blue}">CIC <b>${p(current.val_f1mp_cicddos2019)}</b></span><span style="--series:${C.coral}">UNSW <b>${p(current.val_f1mp_unsw_nb15)}</b></span><span style="--series:${C.green}">Trung bình <b>${p(current.val_score)}</b></span></div>`;
     }
     function confusion(state){
-      const key=state.method||'prox',source=state.testSource||'cicddos2019',mode=state.matrixMode||'percent',m=data.methods[key],classes=data.classes;
+      const key=state.method||'das',source=state.testSource||'unsw_nb15',mode=state.matrixMode||'percent',m=data.methods[key],classes=data.classes;
       const cm=classes.map(a=>classes.map(b=>m.confusion.find(r=>r.dataset_id===source&&r.true===a&&r.pred===b).n));
-      const short=['Bình thường','DoS/DDoS','Tấn công khác'],size=90,x0=230,y0=52;
-      let body=tx(364,19,'NHÃN DỰ ĐOÁN','s-axis','text-anchor="middle"');
-      short.forEach((s,i)=>{body+=tx(x0+i*size+43,40,s,'s-matrix-axis','text-anchor="middle"')+tx(x0-18,y0+i*size+47,s,'s-label','text-anchor="end"');});
+      const short=['Bình thường','DoS/DDoS','Tấn công khác'],size=118,x0=230,y0=58,c=(size-5)/2;
+      let body=tx(x0+size*1.5,19,'NHÃN DỰ ĐOÁN','s-axis','text-anchor="middle"');
+      short.forEach((s,i)=>{body+=tx(x0+i*size+c,44,s,'s-matrix-axis','text-anchor="middle"')+tx(x0-18,y0+i*size+c+8,s,'s-label','text-anchor="end"');});
       cm.forEach((r,i)=>{
         const total=r.reduce((a,b)=>a+b,0);
         r.forEach((v,j)=>{
           const share=total?v/total:null;
           body+=rect(x0+j*size,y0+i*size,size-5,size-5,total?`rgba(36,89,196,${.06+(share||0)*.63})`:'#eef1f5',9);
-          body+=tx(x0+j*size+42,y0+i*size+48,total?(mode==='count'?n(v):n(share*100,1)+'%'):'N/A','s-matrix-value',`text-anchor="middle" style="fill:${C.ink}"`);
+          body+=tx(x0+j*size+c,y0+i*size+c+10,total?(mode==='count'?n(v):n(share*100,1)+'%'):'N/A','s-matrix-value',`text-anchor="middle" style="fill:${C.ink}"`);
         });
       });
       body+=tx(745,47,'RECALL THEO LỚP','s-axis');
       m.per_class.filter(r=>r.dataset_id===source).forEach((r,i)=>{
-        const y=96+i*92;body+=tx(745,y,short[i],'s-label')+tx(1115,y,p(r.recall),'s-value','text-anchor="end"')+rect(745,y+16,370,8,'#e6ebf2',4)+rect(745,y+16,(r.recall||0)*370,8,C.blue,4)+tx(745,y+50,`support ${n(r.support)}`,'s-caption');
+        const y=104+i*112;body+=tx(745,y,short[i],'s-label')+tx(1115,y,p(r.recall),'s-value','text-anchor="end"')+rect(745,y+16,370,8,'#e6ebf2',4)+rect(745,y+16,(r.recall||0)*370,8,C.blue,4)+tx(745,y+50,`support ${n(r.support)}`,'s-caption');
       });
-      return controls(select('method','Mô hình',Object.entries(labels),key),select('testSource','Nguồn test',data.sources.map(s=>[s,sources[s]]),source),select('matrixMode','Hiển thị',[['percent','Tỷ lệ theo hàng'],['count','Số mẫu']],mode))+frame(body,'Ma trận nhầm lẫn argmax và recall theo lớp',1200,350)+note('Hàng = nhãn thật. Lớp không có mẫu thật: N/A. FAR nhị phân dùng quy tắc xác suất riêng.');
+      return controls(select('method','Mô hình',Object.entries(labels),key),select('testSource','Nguồn test',data.sources.map(s=>[s,sources[s]]),source),select('matrixMode','Hiển thị',[['percent','Tỷ lệ theo hàng'],['count','Số mẫu']],mode))+frame(body,'Ma trận nhầm lẫn argmax và recall theo lớp',1200,420)+note('Hàng = nhãn thật. Lớp không có mẫu thật: N/A. FAR nhị phân dùng quy tắc xác suất riêng.');
     }
 
     function render(slide,state={}){
@@ -424,48 +424,56 @@
           return frame(body,'Ma trận phương pháp, đầu vào và ngân sách',1200,310)+`<div class="checkpoint-route"><span>Train: học trọng số</span><b>→</b><strong>Validation: chọn best</strong><b>→</b><span>Test: chấm mô hình đã chốt</span></div>`+note('Seed 0. Best FL / centralized theo F1-macro-present trung bình theo nguồn trên validation; local theo validation của chính client.');
         }
         case 'metrics':{
+          // Trái: flow → mô hình → 3 xác suất. Phải: 3 nhánh câu hỏi, mỗi nhánh tô sáng phần xác suất được dùng.
+          const P=[['Bình thường',0.20,C.green],['DoS/DDoS',0.70,C.blue],['Tấn công khác',0.10,C.purple]];
+          const probs=P.map(([name,v,col])=>`<div class="me-prob"><span>${name}</span><div><i style="width:${v*100}%;background:${col}"></i></div><b>${n(v,2)}</b></div>`).join('');
+          const left=`<div class="me-left"><div class="me-step"><svg viewBox="0 0 64 64" aria-hidden="true">${icon('data',0,0,64,C.blue)}</svg><b>1 flow</b></div><em>↓</em><div class="me-step model"><svg viewBox="0 0 64 64" aria-hidden="true">${icon('train',0,0,64,C.green)}</svg><b>Mô hình</b><small>dự đoán 1 lần</small></div><em>↓</em><div class="me-probs"><header>3 xác suất (ví dụ)</header>${probs}</div></div>`;
+          const strip=on=>`<div class="me-strip">${P.map(([name,v,col],k)=>`<i style="flex:${v};background:${col}" class="${on.includes(k)?'on':''}">${v>=0.15?n(v,2):''}</i>`).join('')}</div>`;
+          const branches=[[C.blue,'Flow thuộc lớp nào?',[1],'Lớp có xác suất cao nhất','DoS/DDoS',['F1 macro','Acc']],
+            [C.coral,'Có phải tấn công không?',[1,2],'Mọi phần không phải bình thường: 0,70 + 0,10 = 0,80 ≥ 0,5','Tấn công',['F1','Recall','FAR ↓','AUC']],
+            [C.purple,'Có phải DoS/DDoS không?',[1],'Xác suất DoS/DDoS: 0,70 ≥ 0,5','DoS/DDoS',['F1','Recall','FAR ↓','AUC']]];
+          const right=`<div class="me-right">${branches.map(([col,q,on,how,res,ms],k)=>`<div class="me-branch" style="--c:${col}"><span class="me-no">${k+1}</span><div class="me-q"><h3>${q}</h3>${strip(on)}<small>${how}</small></div><div class="me-res"><small>Kết quả</small><b>${res}</b></div><div class="me-chips"><small>Chỉ số</small>${ms.map(m=>`<span>${m}</span>`).join('')}</div></div>`).join('')}</div>`;
+          const gloss=[['F1','vừa bắt đúng vừa ít báo nhầm'],['Recall','% tấn công thật bắt được'],['FAR ↓','% flow bình thường bị báo nhầm'],['AUC','khả năng tách hai nhóm, không phụ thuộc ngưỡng'],['Điểm cuối','trung bình test CIC và UNSW']];
+          return `<div class="me-center"><div class="me-wrap">${left}<b class="me-arrow">→</b>${right}</div><div class="me-gloss">${gloss.map(([k,v])=>`<span><b>${k}</b>${v}</span>`).join('')}</div></div>`;
+        }
+        case 'scoreboard':{
+          // Bảng 8 mô hình × 10 chỉ số, nhóm theo 3 câu hỏi của slide phương pháp; tô ô tốt nhất mỗi cột.
+          const qg=[[C.blue,'① Thuộc lớp nào?',[['f1_macro_present','F1 macro',1],['acc','Acc',1]]],
+            [C.coral,'② Có phải tấn công?',[['attack_f1','F1',1],['attack_recall','Recall',1],['attack_far_benign','FAR ↓',-1],['attack_roc_auc','AUC',1]]],
+            [C.purple,'③ Có phải DoS/DDoS?',[['dos_f1','F1',1],['dos_recall','Recall',1],['dos_far_benign','FAR ↓',-1],['dos_roc_auc','AUC',1]]]];
+          const cols=qg.flatMap(([col,,ms])=>ms.map(m=>[...m,col]));
+          const groupsSB=[['Local · mỗi client tự học',LOCALS],['Centralized · gom dữ liệu',['central']],['Học liên kết',['all','das','prox']]];
+          const keys=groupsSB.flatMap(g=>g[1]),val=(k,m)=>row(k,'mean_over_sources')[m];
+          const pick=(ks,m,dir)=>ks.reduce((a,b)=>(val(b,m)-val(a,m))*dir>0?b:a);
+          const best=Object.fromEntries(cols.map(([m,,dir])=>[m,pick(keys,m,dir)]));
+          const fl=['all','das','prox'],flBest=Object.fromEntries(cols.map(([m,,dir])=>[m,pick(fl,m,dir)]));
+          const top=`<span></span>${qg.map(([col,q,ms])=>`<b class="sb-q" style="--c:${col};grid-column:span ${ms.length}">${q}</b>`).join('')}`;
+          const head=`<span></span>${cols.map(([,name,,col])=>`<b class="sb-h" style="--c:${col}">${name}</b>`).join('')}`;
+          const body=groupsSB.map(([g,ks])=>`<i class="sb-group">${g}</i>`+ks.map(k=>`<span class="sb-name${fl.includes(k)?' fl':''}">${labels[k]}</span>${cols.map(([m])=>`<em class="${best[m]===k?'best':''}">${p(val(k,m))}</em>`).join('')}`).join('')).join('');
+          const take=`<p class="sb-take">Trong học liên kết: F1 macro cao nhất là <b>${labels[flBest.f1_macro_present]}</b> · F1 DoS/DDoS cao nhất là <b>${labels[flBest.dos_f1]}</b> · báo nhầm ít nhất là <b>${labels[flBest.attack_far_benign]}</b>. Không mô hình nào thắng mọi cột.</p>`;
+          return `<div class="sb-center"><div class="sb-grid" style="--n:${cols.length}">${top}${head}${body}</div>${take}${note('Trung bình hai nguồn test · seed 0 · ô xanh: tốt nhất của cột trên cả 8 mô hình · FAR ↓ càng thấp càng tốt.')}</div>`;
+        }
+        case 'baseline':return comparison([...LOCALS,'das','prox','central'],metric,source);
+        case 'review':{
+          // Radar: mỗi phương pháp là một đường bao trên 6 trục (đều "càng ra ngoài càng tốt"), kèm ưu / nhược điểm.
+          const series=[['local_c3','Local tốt nhất (UNSW #3)'],['central','Centralized'],['all','FedAvg · ALL'],['das','FedAvg · DAS'],['prox','FedProx · DAS']];
+          const axes=[['f1_macro_present','F1 macro'],['attack_f1','Attack F1'],['attack_recall','Attack recall'],['far','Ít báo nhầm'],['dos_f1','DoS F1'],['dos_recall','DoS recall']];
+          const v=(k,a)=>{const r=row(k,'mean_over_sources');return a==='far'?1-r.attack_far_benign:r[a];};
+          const focus=state.focus||'all-series',cx=330,cy=215,R=160,N=axes.length,pt=(i,s)=>{const ang=-Math.PI/2+i*2*Math.PI/N;return [cx+Math.cos(ang)*R*s,cy+Math.sin(ang)*R*s];};
           let body='';
-          [['Ba lớp','argmax P(c)','F1-macro-present'],['Mọi tấn công','1 − P(BENIGN) ≥ 0,5','Attack-F1 · FAR'],['DoS/DDoS','P(DOS_DDOS) ≥ 0,5','DoS-F1 · FAR']].forEach(([name,rule,score],i)=>{
-            const x=200+i*400;body+=circle(x,96,60,['#edf3fc','#fff0e9','#eff2fb'][i])+icon(['select','shield','results'][i],x-29,67,58,[C.blue,C.coral,C.purple][i])+tx(x,199,name,'s-scene-title','text-anchor="middle"')+tx(x,247,rule,'s-field','text-anchor="middle"')+tx(x,299,score,'s-label','text-anchor="middle"');
-          });
-          return frame(body,'Ba nhiệm vụ đánh giá với quy tắc quyết định khác nhau',1200,340)+`<div class="evidence-line"><strong>Mean = (metric CIC + metric UNSW) / 2</strong><span>Pooled tính lại từ dự đoán gộp</span></div>`+note('Macro-present: CIC có 2 lớp thật, UNSW có 3. FAR lấy mẫu số là BENIGN.');
-        }
-        case 'baseline':return comparison([...LOCALS,'das','central'],metric,source);
-        case 'transfer':{
-          const keys=[...LOCALS,'das','central'];let body=tx(527,29,'TEST CIC','s-axis','text-anchor="middle"')+tx(842,29,'TEST UNSW','s-axis','text-anchor="middle"');
-          keys.forEach((key,i)=>{
-            const y=50+i*54;body+=tx(360,y+31,labels[key],'s-label','text-anchor="end"');
-            data.sources.forEach((s,j)=>{const value=row(key,s)[metric],x=390+j*315;body+=rect(x,y,275,46,`rgba(36,89,196,${.06+(value||0)*.53})`,8)+tx(x+137,y+32,p(value),'s-value','text-anchor="middle"');});
-          });
-          return controls(keyMetrics(metric))+frame(body,'Ma trận đánh giá xuyên nguồn theo mô hình',1200,385)+note('Một mô hình local có thể tốt trên nguồn riêng nhưng giảm mạnh khi chuyển miền.');
-        }
-        case 'all-das':{
-          let body='';const x0=280,pw=740;
-          [0,.25,.5,.75,1].forEach(t=>{const x=x0+t*pw;body+=`<line x1="${x}" y1="40" x2="${x}" y2="300" class="plot-grid"/>`+tx(x,329,n(t*100)+'%','s-axis','text-anchor="middle"');});
-          ['cicddos2019','unsw_nb15','mean_over_sources'].forEach((s,i)=>{
-            const y=86+i*87,a=row('all',s)[metric],b=row('das',s)[metric],delta=(b-a)*100;
-            body+=tx(250,y+8,['CIC','UNSW','Trung bình'][i],'s-label','text-anchor="end"')+`<line x1="${x0+a*pw}" y1="${y}" x2="${x0+b*pw}" y2="${y}" stroke="${C.blue}" stroke-width="5" class="draw-curve" pathLength="1"/>`+circle(x0+a*pw,y,10,C.gray)+circle(x0+b*pw,y,12,C.blue)+tx(x0+a*pw,y-20,p(a),'s-axis','text-anchor="middle"')+tx(x0+b*pw,y+35,p(b),'s-value','text-anchor="middle"')+tx(1100,y+8,(delta>0?'+':'')+n(delta,2),'s-label','text-anchor="middle"');
-          });
-          return controls(keyMetrics(metric))+`<div class="chart-legend"><span style="--series:${C.gray}">ALL · 23 đầu vào</span><span style="--series:${C.blue}">DAS · 18 đầu vào</span><span>Chênh lệch: điểm phần trăm</span></div>`+frame(body,'Biểu đồ dumbbell ALL so với DAS')+note(`Cùng mẫu và ngân sách. Best ALL vòng ${row('all').selected_round}; best DAS vòng ${row('das').selected_round}, chọn riêng bằng validation.`);
-        }
-        case 'das-tradeoff':{
-          let body='';
-          [['f1_macro_present','F1-macro'],['dos_f1','F1 DoS/DDoS'],['attack_far_benign','FAR mọi tấn công ↓']].forEach(([key,name],i)=>{
-            const a=row('all',source)[key],b=row('das',source)[key],delta=(b-a)*100,x=200+i*400;
-            body+=tx(x,37,name,'s-scene-title','text-anchor="middle"')+tx(x,115,p(a),'s-number s-gray','text-anchor="middle"')+tx(x,163,'ALL → DAS','s-axis','text-anchor="middle"')+tx(x,231,p(b),'s-number s-blue','text-anchor="middle"')+tx(x,298,(delta>0?'+':'')+n(delta,2)+' điểm %','s-label','text-anchor="middle"');
-          });
-          return controls(keySource(source))+frame(body,'Ba mặt đánh đổi của lựa chọn đặc trưng')+note('F1 cao hơn là tốt; FAR thấp hơn là tốt. DAS không cải thiện đồng thời mọi mục tiêu.');
-        }
-        case 'heterogeneity':{
-          const key=state.curve||'das';return controls(select('curve','Lịch sử validation',[['das',labels.das],['all',labels.all],['prox',labels.prox]],key))+curve(key,Number(state.round||1))+note('Đủ 30 vòng. Khác biệt miền là một giả thuyết giải thích; không khẳng định duy nhất nguyên nhân.');
-        }
-        case 'prox-mechanism':{
-          let body=tx(600,38,'L(w) = L_local(w) + μ/2 · ‖w − w_global‖²','s-formula','text-anchor="middle"');
-          body+=circle(600,205,111,'#edf6f1','stroke="#8ab7a0" stroke-dasharray="7 8" stroke-width="2"')+circle(600,205,10,C.green)+tx(600,249,'w_global','s-label','text-anchor="middle"');
-          ['M600,205L272,104','M600,205L930,105'].forEach(d=>body+=edge(d,C.gray,true));
-          ['M600,205L536,145','M600,205L674,150'].forEach(d=>body+=edge(d,C.blue,true)+pulse(d,C.blue));
-          body+=lines(210,154,['Client A','hướng cục bộ'],'s-label',30,'text-anchor="middle"')+lines(1000,154,['Client B','hướng cục bộ'],'s-label',30,'text-anchor="middle"')+tx(600,351,'Neo cập nhật gần mô hình đầu vòng · μ = 0,1','s-emphasis','text-anchor="middle"');
-          return frame(body,'Minh họa trực giác số hạng proximal, không phải quỹ đạo đo')+note('Minh họa cơ chế. Server vẫn FedAvg; số hạng proximal không phải bộ lọc chống đầu độc.');
+          [.25,.5,.75,1].forEach(s=>{body+=`<polygon points="${axes.map((_,i)=>pt(i,s).join(',')).join(' ')}" fill="none" stroke="#dbe4f0" stroke-width="1"/>`;body+=tx(cx+4,cy-R*s+4,`${s*100}%`,'s-caption');});
+          axes.forEach(([,name],i)=>{const [x,y]=pt(i,1),[lx,ly]=pt(i,1.2);body+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#dbe4f0"/>`+tx(lx,ly+5,name,'s-label',`text-anchor="${Math.abs(lx-cx)<10?'middle':lx>cx?'start':'end'}"`);});
+          series.forEach(([k])=>{const on=focus==='all-series'||focus===k,pts=axes.map(([a],i)=>pt(i,Math.max(0,v(k,a)||0)).join(',')).join(' ');
+            body+=`<polygon points="${pts}" fill="${colors[k]}" fill-opacity="${on&&focus!=='all-series'?.18:.04}" stroke="${colors[k]}" stroke-width="${on?3.5:1.5}" stroke-opacity="${on?1:.2}" stroke-linejoin="round"/>`;
+            if(on&&focus!=='all-series')axes.forEach(([a],i)=>{const [x,y]=pt(i,v(k,a));body+=circle(x,y,5,colors[k])+tx(x,y-10,p(v(k,a)),'s-caption','text-anchor="middle"');});});
+          const r=k=>row(k,'mean_over_sources');
+          const notes={local_c3:[`Không chia sẻ gì`,`F1 macro chỉ ${p(r('local_c3').f1_macro_present)}; báo nhầm ${p(r('local_c3').attack_far_benign)}`],
+            central:[`F1 macro cao nhất ${p(r('central').f1_macro_present)}; DoS FAR chỉ ${p(r('central').dos_far_benign)}`,`Phải gom dữ liệu về một chỗ; báo nhầm tấn công ${p(r('central').attack_far_benign)}`],
+            all:[`Bắt DoS tốt nhất: DoS recall ${p(r('all').dos_recall)}`,`Attack recall thấp ${p(r('all').attack_recall)}`],
+            das:[`Ít báo nhầm nhất: FAR ${p(r('das').attack_far_benign)}`,`F1 macro ${p(r('das').f1_macro_present)}, chỉ ngang local`],
+            prox:[`F1 macro FL cao nhất ${p(r('prox').f1_macro_present)}; Attack F1 ${p(r('prox').attack_f1)}`,`Báo nhầm ${p(r('prox').attack_far_benign)}; DoS F1 ${p(r('prox').dos_f1)}`]};
+          const cards=series.map(([k,name])=>`<div class="rv-card${focus===k?' on':''}" style="--c:${colors[k]}"><b>${name}</b><span class="pro">✓ ${notes[k][0]}</span><span class="con">✗ ${notes[k][1]}</span></div>`).join('');
+          return controls(select('focus','Làm nổi bật',[['all-series','Tất cả phương pháp'],...series],focus))+`<div class="rv-wrap"><div class="rv-chart">${frame(body,'Radar so sánh các phương pháp trên 6 chỉ số',660,430)}</div><div class="rv-cards">${cards}</div></div>`+note('Trung bình hai nguồn test · “Ít báo nhầm” = 1 − FAR mọi tấn công · càng ra ngoài càng tốt.');
         }
         case 'prox-results':return comparison(['das','central','prox'],metric,source)+`<div class="result-observation"><strong>${p(row('prox',source)[metric])}</strong><span>${metricInfo[metric]} · FedProx</span><b>${n((row('prox',source)[metric]-row('das',source)[metric])*100,2)} điểm phần trăm so với FedAvg</b></div>`;
         case 'errors':return confusion(state);

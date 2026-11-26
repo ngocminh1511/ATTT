@@ -278,7 +278,7 @@
       if(slide.view==='roadmap') return visuals?visuals.roadmap():'';
       const group=stageOf(slide),idx=group?.slides.indexOf(slide)||0;
       const sectionLabel=slide.stage==='appendix'?'PHỤ LỤC':`GIAI ĐOẠN ${String(content.stages.findIndex(g=>g.id===slide.stage)+1).padStart(2,'0')}`;
-      const submenu=slide.stage==='results'?`<nav class="results-nav" aria-label="Các trang kết quả">${group.slides.map(s=>`<a href="#${s.id}" ${s.id===slide.id?'aria-current="page"':''}>${s.number}<span>${esc(s.title)}</span></a>`).join('')}</nav>`:'';
+      const submenu='';  // bỏ dãy số trang con của chương kết quả
       return `<article class="slide ${slide.stage==='appendix'?'appendix-slide':''}" data-slide="${slide.id}"><header class="slide-heading">${slide.stage==='appendix'?`<div class="eyebrow"><span>${sectionLabel}</span><span>${idx+1} / ${group?.slides.length||1}</span></div><h1>${esc(slide.title)}</h1>`:`<div class="heading-row"><span class="stage-badge">${String(content.stages.findIndex(g=>g.id===slide.stage)+1).padStart(2,'0')}</span><h1 class="stage-title">${esc(group?.title||'')}</h1><span class="heading-sep" aria-hidden="true"></span><h2 class="slide-subtitle">${esc(slide.title)}</h2><span class="heading-count">${idx+1} / ${group?.slides.length||1}</span></div>`}${slide.message?`<p class="slide-message">${esc(slide.message)}</p>`:''}</header>${submenu}<div class="content-grid full-width"><section class="visual-area" aria-label="Minh họa và số liệu">${renderView(slide,state)}</section></div></article>`;
     }
     function renderMenu(id) {

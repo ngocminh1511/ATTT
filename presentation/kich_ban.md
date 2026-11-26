@@ -2,7 +2,7 @@
 
 Sinh từ `src/slides.json`; chỉnh nguồn rồi chạy `python presentation/build.py`.
 
-Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng → chuẩn hóa → DAS → huấn luyện → kết quả → kết luận.
+Pipeline: dữ liệu → làm sạch → chia tập → tạo đặc trưng → chuẩn hóa → DAS → huấn luyện → kết quả.
 
 Các giá trị thực nghiệm: 4 client (CIC → 1, 2; UNSW → 3, 4), profile main, seed 0; F1 tổng hợp là trung bình đều F1-macro-present hai nguồn, trừ khi ghi khác.
 
@@ -26,7 +26,7 @@ Em chào thầy. Nhóm em gồm Phan Văn Hiếu và Đoàn Ngọc Minh, thực 
 
 **Chỉ vào hình:** Giới thiệu thông tin bên trái, rồi chỉ vào bốn bước đang chạy trong hình bên phải.
 
-**Chuyển ý:** Trước khi đi vào chi tiết, em giới thiệu quy trình thực hiện gồm chín giai đoạn.
+**Chuyển ý:** Trước khi đi vào chi tiết, em giới thiệu quy trình thực hiện gồm tám giai đoạn.
 
 **Nguồn:** Thông tin đề tài do nhóm cung cấp; fl_ddos/multidataset_server.py
 
@@ -34,7 +34,7 @@ Em chào thầy. Nhóm em gồm Phan Văn Hiếu và Đoàn Ngọc Minh, thực 
 
 **Giai đoạn:** Pipeline · **Trạng thái:** Đang bật
 
-**Thông điệp:** Chín giai đoạn từ dữ liệu đến kết luận.
+**Thông điệp:** Tám giai đoạn từ dữ liệu đến đánh giá kết quả.
 
 **Mục tiêu:** Giúp thầy nắm toàn bộ luồng bài làm trước khi đi vào chi tiết.
 
@@ -522,397 +522,110 @@ Ma trận thí nghiệm gồm FedAvg ALL, FedAvg DAS, FedProx DAS, một central
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json; results_modal_multidataset/20261122_235344_298853/status_snapshot.json; baselines/multidataset_baselines.py
 
-## 20 · Ba câu hỏi đánh giá, ba cách đọc kết quả
+## 20 · Phương pháp đánh giá
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
-**Thông điệp:** Không dùng F1 phân loại ba lớp để thay cho F1 phát hiện riêng DoS/DDoS.
+**Thông điệp:** Mô hình dự đoán một lần ra 3 xác suất; ba câu hỏi là ba cách đọc kết quả đó, mỗi câu có bộ chỉ số riêng.
 
-**Mục tiêu:** Phân biệt nhiệm vụ, cách tổng hợp nguồn và các tỷ lệ báo động giả.
+**Mục tiêu:** Người nghe hiểu ba thước đo trước khi xem số.
 
 **Nội dung trên slide:**
 
-- Ba lớp: argmax, F1-macro-present theo support thật
-- Mọi tấn công: điểm 1 − P(BENIGN), ngưỡng 0,5
-- DoS/DDoS: điểm P(DOS_DDOS), ngưỡng 0,5
+- Thuộc lớp nào? → F1 macro, Acc
+- Có phải tấn công? → Attack F1, recall, FAR, AUC
+- Có phải DoS/DDoS? → DoS F1, recall, FAR, AUC
+- Điểm cuối = trung bình test CIC và test UNSW
 
 **Lời trình bày:**
 
-Đầu tiên, phân loại ba lớp dùng argmax và tính F1 cho từng lớp có support thật. CIC có hai lớp thật, UNSW có ba lớp, nên F1-macro-present của mỗi nguồn không có cùng số lớp trong phép trung bình. Thứ hai, phát hiện mọi tấn công dùng một trừ xác suất BENIGN với ngưỡng 0,5. Thứ ba, phát hiện riêng DoS/DDoS dùng xác suất DOS_DDOS với cùng ngưỡng. FAR trên benign là tỷ lệ mẫu bình thường bị báo là tấn công của nhiệm vụ tương ứng. Chỉ số tổng hợp chính lấy trung bình đều hai nguồn test, không phải tính F1 từ dự đoán gộp. Các bảng luôn ghi rõ nhiệm vụ và cách gộp để tránh hiểu nhầm.
+Phần này em trình bày phương pháp đánh giá. Mô hình chỉ dự đoán một lần và cho ra ba xác suất cho mỗi flow: bình thường, DoS/DDoS và tấn công khác. Từ ba xác suất đó em đặt ba câu hỏi. Một, flow thuộc lớp nào: lấy lớp có xác suất cao nhất, đo bằng F1 macro và accuracy. Hai, flow có phải tấn công không: báo tấn công khi một trừ xác suất bình thường từ 0,5 trở lên, đo bằng F1, recall, tỷ lệ báo động giả FAR và AUC. Ba, flow có phải DoS/DDoS không, đúng mục tiêu chính của đề tài: dùng xác suất DoS/DDoS với cùng ngưỡng và cùng bốn chỉ số. FAR càng thấp càng tốt, các chỉ số còn lại càng cao càng tốt. Mỗi chỉ số tính riêng trên test CIC và test UNSW rồi lấy trung bình.
 
-**Chỉ vào hình:** Chỉ điểm số, ngưỡng và nhãn thật của từng nhiệm vụ; chỉ chú thích mean khác pooled.
+**Chỉ vào hình:** Chỉ dòng ví dụ 3 xác suất ở trên, rồi đi thẻ 1 → 3: cách quyết định, kết quả của ví dụ, và các chỉ số tương ứng với cột trong bảng kết quả.
 
-**Chuyển ý:** Với cách đọc đó, trước hết em so sánh các cách tổ chức việc học.
+**Chuyển ý:** Với ba thước đo này, đây là kết quả của cả tám mô hình.
+
+**Nếu thầy hỏi:** F1 macro chỉ tính trên các lớp thật sự có trong từng nguồn (CIC không có OTHER_ATTACK), gọi là F1-macro-present. Ngưỡng 50% cố định, chưa tối ưu bằng validation. Điểm cuối lấy trung bình hai nguồn để nguồn lớn không lấn át; số tính trên dự đoán gộp nằm ở phụ lục.
 
 **Nguồn:** fl_ddos/multidataset_eval.py: source_metrics, binary_block, evaluate_checkpoint
 
-## 21 · Học liên kết chỉ vượt local rõ rệt khi dùng FedProx
+## 21 · Kết quả của 8 mô hình
 
 **Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
-**Thông điệp:** Với cùng DAS, FedAvg đạt 46,89% F1-macro trung bình, ngang local tốt nhất (46,63%); centralized đạt 60,89%.
+**Thông điệp:** Centralized có F1 macro cao nhất (60,89%); trong học liên kết, FedProx dẫn F1 macro (56,99%) nhưng không mô hình nào thắng mọi chỉ số.
 
-**Mục tiêu:** Đọc trung thực mức lợi của học chung so với local, không phóng đại kết quả FedAvg.
-
-**Nội dung trên slide:**
-
-- Local CIC #1/#2: 42,07% / 42,00%; Local UNSW #3/#4: 46,63% / 44,02%
-- FedAvg DAS chỉ hơn local tốt nhất 0,26 điểm phần trăm
-- Trên nguồn riêng, local vẫn có thể tốt hơn mô hình chung
-
-**Lời trình bày:**
-
-Ở biểu đồ mặc định, mỗi mô hình được chấm trên cả hai nguồn rồi lấy trung bình đều. Hai local học CIC đạt khoảng 42 phần trăm F1-macro, hai local học UNSW đạt 46,63 và 44,02 phần trăm. FedAvg DAS đạt 46,89 phần trăm, chỉ hơn local tốt nhất 0,26 điểm, tức gần như ngang nhau. Centralized đạt 60,89 phần trăm. Như vậy, với bốn client, chỉ phối hợp bằng FedAvg chưa đủ để vượt rõ các mô hình local trên chỉ số tổng hợp; lợi ích rõ hơn xuất hiện khi dùng FedProx, em sẽ trình bày ở phần sau. Khi chỉ đánh giá trên nguồn riêng, local có thể tốt hơn. Centralized là một mốc thực nghiệm, không phải cận trên toán học. Có thể đổi nguồn để thấy rõ điều kiện của kết luận.
-
-**Chỉ vào hình:** Xem trung bình trước, so FedAvg DAS với local UNSW #3; rồi chuyển CIC và UNSW để quan sát đảo thứ hạng.
-
-**Chuyển ý:** Ma trận đánh giá chéo giải thích vì sao từng mô hình local có điểm tổng hợp thấp.
-
-**Nếu thầy hỏi:** FedAvg DAS gần như ngang local tốt nhất; em không kết luận FedAvg thắng local trong lượt này.
-
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
-
-## 22 · Local gặp khó khi chuyển sang nguồn chưa học
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** Điểm trên miền riêng và khả năng dùng chung trên hai miền là hai mục tiêu khác nhau.
-
-**Mục tiêu:** Đọc sự chênh lệch trong/ngoài miền thay vì chỉ nhìn một số trung bình.
+**Mục tiêu:** Cho thấy toàn cảnh kết quả trên một bảng trước khi so sánh chi tiết.
 
 **Nội dung trên slide:**
 
-- Local CIC #1: F1-macro 59,69% trên CIC, 24,45% trên UNSW
-- Local UNSW #3: 67,80% trên UNSW, 25,47% trên CIC
-- FedAvg DAS: 59,65% / 34,12% trên CIC / UNSW
+- Local: 42–47% F1 macro; Local UNSW báo nhầm tới 39–44%
+- Centralized: 60,89% F1 macro
+- FedProx DAS 56,99% · FedAvg ALL 50,26% F1 DoS · FedAvg DAS FAR 3,01%
 
 **Lời trình bày:**
 
-Mỗi hàng là một mô hình, mỗi cột là một nguồn test. Hai local CIC gần như giống nhau, khoảng 59,7 phần trăm trên CIC nhưng chỉ khoảng 24 phần trăm khi chuyển sang UNSW. Hai local UNSW đạt khoảng 67,8 phần trăm trên UNSW và chỉ 20 đến 25 phần trăm trên CIC. Hai client cùng nguồn cho kết quả sát nhau vì dữ liệu được chia phân tầng. FedAvg DAS đạt 59,65 trên CIC nhưng chỉ 34,12 phần trăm trên UNSW: mô hình chung giữ được CIC nhưng chưa học tốt UNSW. Điều này phù hợp với việc local chỉ quan sát một phân phối và, với CIC, còn không có ví dụ OTHER_ATTACK. Em không lấy trung bình các ô trong miền của local để thay cho một checkpoint toàn cục; đó là hệ thống nhiều mô hình chuyên biệt và cần được mô tả riêng.
+Bảng này là toàn bộ kết quả, mỗi ô là trung bình hai nguồn test. Các mô hình local chỉ đạt khoảng 42 đến 47 phần trăm F1 macro, và hai local UNSW báo nhầm rất nhiều, gần 40 phần trăm. Centralized, gom toàn bộ dữ liệu về một chỗ, đạt cao nhất 60,89 phần trăm. Trong ba mô hình học liên kết, FedProx cao nhất về F1 macro với 56,99 phần trăm; FedAvg với đủ đặc trưng bắt DoS/DDoS tốt nhất; còn FedAvg với DAS ít báo nhầm nhất, chỉ 3,01 phần trăm. FedProx hơn FedAvg khoảng mười điểm F1 macro chủ yếu nhờ UNSW: FedAvg chỉ đạt khoảng 34 phần trăm trên UNSW, FedProx kéo lên khoảng 61 phần trăm, chỉ kém centralized 3,9 điểm. Không có mô hình nào thắng mọi chỉ số.
 
-**Chỉ vào hình:** Chỉ các ô trong miền của local rồi đi ngang sang ô ngoài miền; so hai local cùng nguồn.
+**Chỉ vào hình:** Đọc theo ba nhóm cột ①②③ như slide phương pháp; chỉ các ô xanh là tốt nhất mỗi cột, rồi đọc dòng kết luận.
 
-**Chuyển ý:** Tiếp theo, em giữ cách học FedAvg và chỉ thay đổi bộ đặc trưng để kiểm tra DAS.
+**Chuyển ý:** Tiếp theo em xem kỹ ba mô hình học liên kết đánh đổi nhau thế nào.
 
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
-
-## 23 · Với 4 client, DAS không nâng F1 tổng hợp
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** F1-macro trung bình giảm từ 50,70% (ALL) xuống 46,89% (DAS), tương đương 3,81 điểm phần trăm.
-
-**Mục tiêu:** Trình bày đúng kết quả đối chứng ALL/DAS, kể cả khi DAS không thắng.
-
-**Nội dung trên slide:**
-
-- CIC: 66,72% → 59,65%, giảm 7,07 điểm phần trăm
-- UNSW: 34,67% → 34,12%, gần như không đổi
-- Cùng subset và ngân sách; checkpoint được chọn riêng bằng validation
-
-**Lời trình bày:**
-
-Ở đối chứng này, hai nhánh đều dùng FedAvg với bốn client, nhưng ALL có hai mươi ba đầu vào và DAS có mười tám. F1-macro trung bình hai nguồn giảm từ 50,70 xuống 46,89 phần trăm. Khi tách nguồn, CIC giảm khoảng 7,07 điểm phần trăm, còn UNSW gần như không đổi ở mức khoảng 34 phần trăm. Như vậy, trong lượt chạy này, bỏ năm cột liên tục làm mất một phần thông tin hữu ích cho CIC, trong khi không giúp FedAvg học UNSW tốt hơn. Mỗi nhánh được chọn best checkpoint theo cùng quy tắc validation: ALL ở vòng mười ba và DAS ở vòng hai mươi lăm. Kết luận chỉ áp dụng cho cấu hình bốn client và một seed; DAS vẫn cho đầu vào gọn hơn và có ảnh hưởng khác lên báo động giả, em trình bày ở slide sau.
-
-**Chỉ vào hình:** Đọc ba hàng CIC, UNSW và trung bình; chỉ khoảng giảm lớn ở CIC và UNSW gần như đứng yên.
-
-**Chuyển ý:** F1-macro mới chỉ là một góc nhìn; cần kiểm tra nhiệm vụ DoS/DDoS và báo động giả.
-
-**Nếu thầy hỏi:** Ranking và danh sách cột DAS không đổi so với bản trước; thay đổi đến từ cách chia client và quá trình huấn luyện, nên cần nhiều seed để tách hai yếu tố.
-
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
-
-## 24 · DAS giảm F1, đổi lại ít báo động giả hơn
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** So với ALL, DAS có F1-macro và F1 DoS/DDoS thấp hơn, nhưng FAR mọi tấn công giảm.
-
-**Mục tiêu:** Đánh giá DAS theo nhiều chỉ số phù hợp với mục tiêu phát hiện tấn công.
-
-**Nội dung trên slide:**
-
-- F1 DoS/DDoS: 50,26% → 44,98%
-- FAR mọi tấn công trên BENIGN: 4,45% → 3,01%
-- Kết luận phụ thuộc nhiệm vụ, nguồn và ngưỡng quyết định
-
-**Lời trình bày:**
-
-DAS không tốt hơn trên mọi chỉ số, nhưng cũng không kém trên mọi chỉ số. Ở ngưỡng 0,5 đang cố định, F1 phát hiện riêng nhóm DoS/DDoS trung bình hai nguồn giảm từ 50,26 xuống 44,98 phần trăm. Ngược lại, tỷ lệ báo động giả cho nhiệm vụ mọi tấn công giảm từ 4,45 xuống 3,01 phần trăm, tức DAS ít gán nhầm lưu lượng bình thường là tấn công hơn. Kết luận hợp lý là trong lượt bốn client, DAS tạo biểu diễn gọn hơn và thận trọng hơn, nhưng đánh đổi bằng F1. Nếu ưu tiên phát hiện DoS, ALL đang tốt hơn; nếu ưu tiên hạn chế cảnh báo giả, DAS có lợi thế nhỏ. Cần chọn lại đặc trưng, loss và ngưỡng dựa trên validation theo mục tiêu vận hành.
-
-**Chỉ vào hình:** Chỉ chiều tốt/xấu của từng chỉ số; FAR có mũi tên giảm là tốt và là chỉ số duy nhất DAS thắng.
-
-**Chuyển ý:** Ngoài đầu vào, sự khác biệt trong cập nhật học giữa các client cũng cần được xem xét.
-
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/all/evaluation_by_dataset.csv; results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv
-
-## 25 · Chung đầu vào chưa làm hai nguồn học giống nhau
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** Với FedAvg, validation UNSW kẹt quanh 32% trong khi CIC gần 99%; FedProx kéo UNSW lên 62%.
-
-**Mục tiêu:** Dùng lịch sử thật để đặt vấn đề về tối ưu trong môi trường khác phân phối.
-
-**Nội dung trên slide:**
-
-- FedAvg DAS: best vòng 25, UNSW validation chỉ 16% → 32%
-- FedProx: UNSW tăng dần đến 62% ở vòng 30, CIC giữ khoảng 96%
-- Khác biệt cập nhật là giả thuyết giải thích, không phải nguyên nhân duy nhất đã chứng minh
-
-**Lời trình bày:**
-
-Biểu đồ hiển thị đủ ba mươi vòng validation, đường CIC và UNSW là trung bình của hai client cùng nguồn. Với FedAvg DAS, CIC đạt gần chín mươi chín phần trăm ngay từ đầu, còn UNSW chỉ tăng từ khoảng mười sáu lên ba mươi hai phần trăm rồi đứng yên; best ở vòng hai mươi lăm. Nhánh ALL cũng có UNSW quanh ba mươi ba phần trăm. Một cách giải thích là phần cập nhật từ hai client CIC và hai client UNSW đi theo hướng khác nhau, và mô hình chung nghiêng về CIC. Khi chuyển sang FedProx, đường UNSW tăng đều đến sáu mươi hai phần trăm ở vòng ba mươi, trong khi CIC chỉ giảm nhẹ. Tuy vậy, đường validation không tự chứng minh nguyên nhân duy nhất; loss, kiến trúc, mất cân bằng và độ lệch train/test cũng có thể góp phần. Lưu ý thêm: validation CIC rất cao nhưng test CIC chỉ khoảng sáu mươi phần trăm, do test CIC lấy từ ngày khác.
-
-**Chỉ vào hình:** Chọn FedAvg DAS để xem khoảng cách CIC/UNSW, rồi chuyển FedProx để thấy đường UNSW đi lên; đây là validation, không phải test theo vòng.
-
-**Chuyển ý:** FedProx, cách học có điểm neo đã giới thiệu ở chương 7, được kiểm chứng trên cùng bộ DAS ở slide tiếp theo.
-
-**Nếu thầy hỏi:** Validation CIC cao hơn test CIC nhiều vì test CIC là ngày thu thập khác; em không dùng validation để suy ra điểm test.
-
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/fl/*_rounds.csv; results_modal_multidataset/20261122_152058_5ec64a/main/all/fl/*_rounds.csv
-
-## 26 · FedProx tăng F1-macro, đổi lại DoS-F1 giảm và báo động giả tăng
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** F1-macro trung bình đạt 56,99%, cao hơn FedAvg DAS 10,10 điểm phần trăm, vẫn thấp hơn centralized 3,90 điểm.
-
-**Mục tiêu:** Đọc kết quả cải tiến cùng giới hạn và đánh đổi thay vì chỉ chọn chỉ số thuận lợi.
-
-**Nội dung trên slide:**
-
-- UNSW: 34,12% → 60,91%; CIC: 59,65% → 53,07%
-- F1 DoS/DDoS: 44,98% → 36,01%; FAR mọi tấn công: 3,01% → 16,96%
-- Best FedProx ở vòng 30 (vòng cuối); một seed nên chưa kết luận ưu thế tổng quát
-
-**Lời trình bày:**
-
-Với cùng bộ DAS và bốn client, FedProx đạt F1-macro trung bình 56,99 phần trăm, cao hơn FedAvg DAS 10,10 điểm phần trăm và là cấu hình FL tốt nhất. Mức này vẫn thấp hơn centralized 60,89 phần trăm khoảng 3,90 điểm. Khi tách nguồn, phần tăng đến gần như hoàn toàn từ UNSW: từ 34,12 lên 60,91 phần trăm, trong khi CIC giảm từ 59,65 xuống 53,07 phần trăm. Đi kèm là hai đánh đổi: F1 phát hiện DoS/DDoS giảm từ 44,98 xuống 36,01 phần trăm, và FAR mọi tấn công tăng từ 3,01 lên 16,96 phần trăm. Best checkpoint rơi đúng vòng ba mươi, vòng cuối, nên có thể mô hình chưa hội tụ hết. Chưa có nhiều seed hoặc một phép so sánh tốc độ cùng GPU, nên em giới hạn kết luận vào các metric dự đoán đã đo.
-
-**Chỉ vào hình:** Đổi chỉ số từ F1-macro sang DoS-F1 rồi FAR; chuyển nguồn CIC/UNSW để thấy phần tăng nằm ở UNSW.
-
-**Chuyển ý:** Các ma trận nhầm lẫn sẽ giúp xem phần sai còn lại nằm ở những lớp nào.
-
-**Nếu thầy hỏi:** Centralized chọn checkpoint ở epoch 1 theo validation; đây là kết quả của quy tắc chọn, cần nhiều seed để biết có ổn định không.
-
-**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/das/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
-
-## 27 · Nhìn vào lỗi để hiểu giới hạn của điểm tổng hợp
-
-**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
-
-**Thông điệp:** Ma trận nhầm lẫn và recall từng lớp cho biết mô hình đang bỏ sót hay nhầm ở đâu.
-
-**Mục tiêu:** Liên kết kết quả tổng hợp với lỗi cụ thể và phân biệt các quy tắc ra quyết định.
-
-**Nội dung trên slide:**
-
-- Đọc theo hàng nhãn thật, cột nhãn dự đoán
-- CIC không có OTHER_ATTACK thật: hàng đó N/A khi chuẩn hóa
-- Ma trận argmax không thay thế FAR nhị phân ở ngưỡng 0,5
-
-**Lời trình bày:**
-
-Trong ma trận, mỗi hàng là nhãn thật và mỗi cột là nhãn dự đoán bằng argmax. Có thể chọn số đếm hoặc chuẩn hóa theo hàng để xem recall. Hàng OTHER_ATTACK của CIC không có support nên phải ghi không có mẫu thật, không diễn giải thành recall bằng không. Khi so sánh các checkpoint, cần quan sát cả phần benign bị gán tấn công và phần DOS_DDOS bị nhầm sang lớp khác. Ma trận này dùng argmax, còn FAR mọi tấn công dùng ngưỡng trên một trừ xác suất benign, nên không được lấy tùy tiện một ô ma trận để thay FAR trong bảng nhị phân. Phụ lục giữ thêm tỷ lệ phát hiện theo nhãn gốc để truy vết sâu hơn.
-
-**Chỉ vào hình:** Chọn mô hình và nguồn, đổi số đếm/tỷ lệ hàng, đọc đường chéo và recall bên cạnh.
-
-**Chuyển ý:** Từ toàn bộ pipeline và các đối chứng, em tổng kết những gì bài làm đã đạt được.
-
-**Nguồn:** results_modal_multidataset/*/main/*/confusion.csv; results_modal_multidataset/*/main/*/per_class.csv
-
-## 28 · Đóng góp nằm ở cả pipeline và cách kiểm chứng
-
-**Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
-
-**Thông điệp:** Thống nhất dữ liệu, tổ chức học chung và đo đóng góp của từng lựa chọn bằng đối chứng.
-
-**Mục tiêu:** Tóm tắt đóng góp chính xác, không biến tất cả metric thành một kết luận thắng tuyệt đối.
-
-**Nội dung trên slide:**
-
-- Pipeline hai nguồn, bốn client: chia tập trước fit, lưu tham số và truy vết
-- DAS: đầu vào gọn hơn, ít báo động giả hơn nhưng F1 thấp hơn ALL
-- FedProx: tốt nhất trong FL (56,99%), còn sau centralized và FAR cao hơn
-
-**Lời trình bày:**
-
-Bài làm xây dựng được một pipeline từ hai nguồn dữ liệu khác cấu trúc, chia cho bốn client, đến mô hình và báo cáo đánh giá chung. Các bước chia tập, fit tham số từ train, lưu schema và kiểm tra hash giúp đối chứng rõ ràng hơn. Về kết quả trong lượt bốn client: FedAvg DAS chỉ ngang local tốt nhất; DAS có F1 thấp hơn ALL nhưng ít báo động giả hơn; FedProx là cấu hình FL tốt nhất với 56,99 phần trăm F1-macro, chủ yếu nhờ cải thiện UNSW, nhưng vẫn sau centralized và đổi lấy FAR cao hơn. Vì vậy, đóng góp là một pipeline có thể kiểm chứng và các bằng chứng trung thực về lợi ích cùng giới hạn của từng lựa chọn, kể cả những chỗ kết quả không như kỳ vọng.
-
-**Chỉ vào hình:** Chỉ ba lớp đóng góp: dữ liệu, đối chứng, kết quả; các mốc F1 có cùng cách tổng hợp nguồn, centralized là nét đứt tham chiếu.
-
-**Chuyển ý:** Phần cuối là những giới hạn cần giữ khi diễn giải và các bước phát triển tiếp theo.
-
-**Nguồn:** data_paper_multi_4c/main/quality_report.json; results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
-
-## 29 · Từ kết quả thực nghiệm đến bước phát triển tiếp
-
-**Giai đoạn:** Kết luận & hướng đi · **Trạng thái:** Đang bật
-
-**Thông điệp:** Ưu tiên kiểm chứng độ lặp lại và giảm báo động giả trước khi mở rộng kết luận.
-
-**Mục tiêu:** Nêu giới hạn cụ thể và hướng phát triển có liên hệ trực tiếp với vấn đề quan sát.
-
-**Nội dung trên slide:**
-
-- Chạy nhiều seed; thêm vòng cho FedProx vì best rơi vào vòng cuối
-- Xem lại DAS khi chia client; chọn ngưỡng / μ trên validation
-- Rà soát overlap với test và đánh giá thêm dữ liệu độc lập
-
-**Lời trình bày:**
-
-Kết quả hiện tại còn giới hạn ở một seed, bốn client từ hai nguồn và các subset đánh giá. Chưa có độ biến động giữa các lần chạy hoặc chứng cứ cho nhiều môi trường triển khai thực tế. Hướng đầu tiên là chạy thêm seed để kiểm tra khả năng lặp lại, và tăng số vòng cho FedProx vì best checkpoint rơi vào vòng cuối. Thứ hai, DAS cho F1 thấp hơn ALL trong cấu hình này, nên cần xem lại lựa chọn đặc trưng và mục tiêu loss. Thứ ba, chọn μ và ngưỡng dựa trên validation, với mục tiêu rõ về recall, F1 và mức báo động giả chấp nhận được. Cần rà thêm các vector trùng với test, giữ báo cáo trung thực và bổ sung một tập kiểm tra độc lập. Nếu đi đến triển khai thật, còn phải đánh giá truyền thông, riêng tư và vận hành trên hạ tầng phù hợp. Em kết thúc phần chính tại đây và có các trang phụ lục để trao đổi thêm.
-
-**Chỉ vào hình:** Ghép từng giới hạn với bước kiểm chứng tương ứng; dùng nút phụ lục khi thầy hỏi sâu.
-
-**Chuyển ý:** Em xin trao đổi thêm các câu hỏi; có thể quay lại pipeline hoặc mở phụ lục theo chủ đề.
-
-**Nguồn:** data_paper_multi_4c/main/quality_report.json: independence; configs/multidataset.json: train_seeds; Kết quả main của run 4 client đã chốt
-
-## A1 · Công thức và cách tổng hợp chỉ số
-
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
-
-**Thông điệp:** Mỗi chỉ số cần đi cùng nhãn dương, quy tắc quyết định và mẫu số.
-
-**Mục tiêu:** Tra cứu công thức khi cần bảo vệ cách đánh giá.
-
-**Nội dung trên slide:**
-
-- Precision, recall, F1, FAR và accuracy
-- Macro-present chỉ trung bình lớp có support thật
-- Mean nguồn khác metric tính từ predictions pooled
-
-**Lời trình bày:**
-
-Precision đo tỷ lệ dự đoán dương đúng, recall đo tỷ lệ mẫu dương được phát hiện. F1 là trung bình điều hòa của hai đại lượng này. FAR trên benign lấy số mẫu benign bị báo dương chia cho tổng benign, nên với nhiệm vụ DoS không lấy toàn bộ OTHER_ATTACK làm mẫu số benign. F1-macro-present bỏ lớp không có support thật khỏi trung bình, nhưng dự đoán nhầm vào lớp vắng vẫn có thể làm giảm recall của các lớp thật. Trung bình nguồn cho mỗi nguồn một trọng số bằng nhau; pooled tính lại metric sau khi gộp dự đoán. Nếu chỉ số không xác định, bảng ghi N/A thay vì tự gán số không hoặc một.
-
-**Chỉ vào hình:** Đối chiếu nhãn dương và mẫu số trong từng công thức.
-
-**Chuyển ý:** Bảng đầy đủ sau đây cho phép kiểm tra các chỉ số theo từng nguồn.
-
-**Nguồn:** fl_ddos/multidataset_eval.py
-
-## A2 · Bảng kết quả đầy đủ theo nguồn
-
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
-
-**Thông điệp:** Tám mô hình được đánh giá trên cùng hai test; ghi rõ cách tổng hợp khi xem hàng tổng.
-
-**Mục tiêu:** Cung cấp bảng tra cứu số liệu thay vì chỉ các chỉ số được chọn cho slide chính.
-
-**Nội dung trên slide:**
-
-- Accuracy, F1-macro-present, attack-F1, DoS-F1, recall, FAR, AUC
-- Chuyển riêng từng nguồn, mean, worst hoặc pooled
-- Checkpoint, seed và validation score được giữ trong snapshot
-
-**Lời trình bày:**
-
-Bảng này gom các metric của tám mô hình từ CSV đánh giá: bốn local, centralized, FedAvg ALL, FedAvg DAS và FedProx DAS. Bộ chọn nguồn có cả mean_over_sources, worst_source và pooled_predictions. Hàng worst không nhất thiết tương ứng một nguồn duy nhất cho mọi chỉ số, vì mỗi metric được lấy cực trị riêng. Các cột attack và DoS dùng nhãn dương khác nhau nên phải đọc đúng tiêu đề. Cột Best của local và centralized là epoch, của FL là vòng. Tất cả kết quả là seed không, checkpoint đã chọn từ validation và test subset năm mươi nghìn mẫu mỗi nguồn. Không có khoảng tin cậy từ nhiều seed trong bảng này.
-
-**Chỉ vào hình:** Chọn nguồn hoặc cách gộp trước khi đọc ngang một hàng mô hình.
-
-**Chuyển ý:** Nếu cần xem các sai khác cụ thể giữa nhãn, chuyển sang ma trận nhầm lẫn.
+**Nếu thầy hỏi:** Kết quả chỉ có một seed nên chưa có độ lệch chuẩn; chênh lệch dưới khoảng 1 điểm phần trăm chưa đủ để kết luận.
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
-## A3 · Ma trận nhầm lẫn và nhãn tấn công gốc
+## 22 · Ma trận nhầm lẫn: mô hình sai ở đâu
 
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
+**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
-**Thông điệp:** Dùng số đếm, tỷ lệ theo hàng và thống kê nhãn gốc để truy vết lỗi.
+**Thông điệp:** Mỗi hàng là nhãn thật, mỗi cột là nhãn mô hình đoán; đường chéo là đoán đúng, ô ngoài đường chéo là nhầm.
 
-**Mục tiêu:** Tra cứu lỗi sâu hơn theo lớp chung và nhãn tấn công gốc.
-
-**Nội dung trên slide:**
-
-- Ma trận ba lớp dùng dự đoán argmax
-- Tỷ lệ phát hiện theo nhãn gốc không phải phân loại đúng tên loại con
-- Lớp không có mẫu thật được ghi N/A
-
-**Lời trình bày:**
-
-Phần trên giữ ma trận ba lớp của mô hình đã chọn. Bên dưới là các nhóm nhãn gốc cùng support và tỷ lệ bị nhận là attack hoặc DoS. Ví dụ một nhãn con CIC được tính tỷ lệ phát hiện tấn công, chứ mô hình ba lớp không dự đoán chính xác tên DNS hay LDAP. Thống kê này giúp xem lỗi tập trung ở nhóm nào mà F1 tổng hợp có thể che đi. Không cộng hoặc lấy trung bình tùy ý các tỷ lệ nhãn gốc để thay cho recall toàn nguồn vì mỗi nhóm có support khác nhau. Các giá trị đều được lấy từ per_original_label.csv của cùng checkpoint.
-
-**Chỉ vào hình:** Phân biệt cột tên nhãn gốc với ba cột dự đoán của mô hình.
-
-**Chuyển ý:** Bảng đặc trưng tiếp theo cung cấp chi tiết của quyết định DAS.
-
-**Nguồn:** results_modal_multidataset/*/main/*/confusion.csv; results_modal_multidataset/*/main/*/per_original_label.csv
-
-## A4 · Toàn bộ bảng lựa chọn đặc trưng
-
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
-
-**Thông điệp:** Relevance gộp quyết định thứ hạng; relevance từng client là thông tin đối chiếu.
-
-**Mục tiêu:** Có thể giải thích từng cột bị loại và so sánh khác biệt relevance theo client.
+**Mục tiêu:** Cho thấy cụ thể mô hình nhầm lớp nào với lớp nào, thay vì chỉ một con số tổng.
 
 **Nội dung trên slide:**
 
-- 17 cột liên tục, 12 được giữ
-- Lý do loại: redundancy hoặc relevance thấp
-- 6 cột cố định được giữ ngoài danh sách chọn DAS
+- Chọn mô hình và nguồn test ở góc trên
+- FedAvg DAS không đoán lớp Tấn công khác: 78% của lớp này trên UNSW bị coi là bình thường; FedProx đoán đúng 58%
+- Recall theo lớp bên phải: % mẫu thật của lớp được đoán đúng
 
 **Lời trình bày:**
 
-Bảng đầy đủ ghi tên, hạng, relevance gộp, relevance riêng của bốn client và lý do loại. Các quyết định được thực hiện theo relevance gộp và tương quan với cột đã chọn. Một cột có relevance lớn vẫn có thể bị loại nếu trùng thông tin; một cột hữu ích ở một nhóm client có thể có relevance gộp nhỏ. Sáu cột cố định về giao thức và trạng thái duration không nằm trong mười bảy dòng này vì chúng được giữ riêng. Bảng không phải trọng số giải thích của mô hình sau huấn luyện và cũng không chứng minh quan hệ nhân quả giữa đặc trưng với tấn công.
+Ma trận nhầm lẫn cho biết mô hình sai ở đâu. Mỗi hàng là nhãn thật, mỗi cột là nhãn mô hình đoán; ô trên đường chéo là đoán đúng, ô ngoài đường chéo là nhầm. Bên phải là recall của từng lớp, tức bao nhiêu phần trăm mẫu thật của lớp đó được đoán đúng. Điểm đáng chú ý thứ nhất: FedAvg DAS không bao giờ đoán lớp tấn công khác, nên trên UNSW khoảng 78 phần trăm tấn công khác bị đoán là bình thường; đó là lý do FedAvg học UNSW kém. FedProx thì đoán đúng khoảng 58 phần trăm lớp này. Thứ hai, trên CIC cả hai mô hình đều đoán phần lớn DoS/DDoS thành bình thường, khoảng 58 đến 62 phần trăm, vì test CIC lấy từ một ngày thu thập khác. Trên CIC, lớp tấn công khác không có mẫu thật nên ghi N/A.
 
-**Chỉ vào hình:** Đọc một dòng giữ và một dòng loại cùng lý do cụ thể.
+**Chỉ vào hình:** Chọn FedAvg · DAS, nguồn UNSW: chỉ cột Tấn công khác toàn 0; đổi sang FedProx · DAS để so; cuối cùng đổi nguồn CIC để thấy DoS/DDoS bị đoán thành bình thường.
 
-**Chuyển ý:** Phần nguồn và kiểm tra thí nghiệm giúp truy vết lại các con số.
+**Chuyển ý:** Từ bảng số và ma trận nhầm lẫn, em nhận xét ưu và nhược điểm của từng phương pháp.
 
-**Nguồn:** data_paper_multi_4c/main/feature_selection.csv; data_paper_multi_4c/main/features.json
+**Nếu thầy hỏi:** Ma trận dùng nhãn có xác suất cao nhất; FAR nhị phân dùng ngưỡng 0,5 trên xác suất riêng nên có thể khác nhẹ so với đọc từ ma trận.
 
-## A5 · Nguồn số liệu và kiểm tra tính nhất quán
+**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/*/confusion*.csv
 
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
+## 23 · Nhận xét: ưu và nhược điểm của từng phương pháp
 
-**Thông điệp:** Hai run completed cùng bundle; ALL và DAS dùng cùng split; mọi con số đều truy được nguồn.
+**Giai đoạn:** Đánh giá kết quả · **Trạng thái:** Đang bật
 
-**Mục tiêu:** Giải trình nguồn và giới hạn của tính tái lập.
+**Thông điệp:** Học liên kết vượt các mô hình tự học và tiến gần centralized mà không cần gom dữ liệu, nhưng không có phương pháp nào tốt nhất mọi mặt.
+
+**Mục tiêu:** Nhận xét ưu / nhược điểm bằng hình so sánh trực quan thay vì chỉ đọc số.
 
 **Nội dung trên slide:**
 
-- Profile main · seed 0 · bundle bất biến
-- Schema, preprocessor, split và checksum nguồn được lưu
-- Có vector trùng với test được báo cáo; không khẳng định độc lập tuyệt đối
+- Local: không chia sẻ gì nhưng F1 thấp, báo nhầm nhiều
+- Centralized: F1 macro cao nhất nhưng phải gom dữ liệu
+- FedAvg ALL bắt DoS tốt nhất · FedAvg DAS ít báo nhầm nhất · FedProx F1 macro cao nhất trong FL
 
 **Lời trình bày:**
 
-FedAvg ALL, FedAvg DAS, FedProx và bốn local đến từ run 20261122_152058_5ec64a; centralized được chạy riêng trong run 20261122_235344_298853. Cả hai completed và dùng cùng bundle dữ liệu bốn client. ALL và DAS có cùng hash split nhưng khác hash schema và preprocessor theo số cột. Snapshot của bộ trình chiếu lưu đường dẫn và SHA-256 của nguồn đọc để có thể đối chiếu. Báo cáo chất lượng có giao nhóm train/validation bằng không, nhưng vẫn ghi vector trùng với test: điều này cần được công khai và kiểm tra thêm, không tự động chứng minh rò rỉ nhãn. Các job chạy trên GPU A10 hoặc A10G khác nhau, nên dữ liệu hiện có không dùng để kết luận tốc độ tương đối.
+Biểu đồ radar này gom sáu chỉ số, càng ra ngoài càng tốt; mỗi đường là một phương pháp. Local tự học có đường bao nhỏ nhất: không phải chia sẻ gì nhưng F1 thấp và báo nhầm nhiều. Centralized có đường bao lớn nhất ở F1 macro và DoS, nhưng phải gom toàn bộ dữ liệu về một chỗ. Ba cấu hình học liên kết mỗi cái mạnh một hướng: FedAvg với đủ đặc trưng bắt DoS tốt nhất, FedAvg với DAS ít báo nhầm nhất, còn FedProx có F1 macro cao nhất trong học liên kết, chỉ kém centralized 3,9 điểm, đổi lại báo nhầm tăng lên khoảng 17 phần trăm. Vì vậy chọn phương pháp theo mục tiêu vận hành.
 
-**Chỉ vào hình:** Đối chiếu bundle, best round và bảng overlap; mở danh sách checksum khi cần.
+**Chỉ vào hình:** Chọn "Làm nổi bật" lần lượt từng phương pháp để đường của nó đậm lên, đọc ô ưu / nhược tương ứng bên phải.
 
-**Chuyển ý:** Trang cuối tập hợp các câu hỏi phản biện có thể gặp.
+**Chuyển ý:** Phần trình bày của nhóm em đến đây là hết, em xin cảm ơn thầy đã lắng nghe.
 
-**Nguồn:** data_paper_multi_4c/main/quality_report.json; results_modal_multidataset/20261122_152058_5ec64a/status_snapshot.json; results_modal_multidataset/20261122_235344_298853/status_snapshot.json
+**Nếu thầy hỏi:** Chỉ có một seed và ngưỡng 0,5 cố định; chênh lệch dưới khoảng 1 điểm phần trăm chưa đủ để kết luận.
 
-## A6 · Trao đổi và câu hỏi phản biện
-
-**Giai đoạn:** Phụ lục · **Trạng thái:** Đang bật
-
-**Thông điệp:** Mỗi câu trả lời phân biệt thiết kế, bằng chứng thực nghiệm và điều chưa kiểm chứng.
-
-**Mục tiêu:** Chuẩn bị trả lời nhất quán với pipeline và số liệu thực tế.
-
-**Nội dung trên slide:**
-
-- Vì sao FL, vì sao DAS, vì sao kiến trúc lai?
-- FedProx giải quyết gì và chưa giải quyết gì?
-- Kết quả có lặp lại và dùng được trong thực tế chưa?
-
-**Lời trình bày:**
-
-Em chuẩn bị các câu hỏi theo ba nhóm: lựa chọn thiết kế, cách đánh giá và giới hạn kết luận. Với mỗi câu, phần trả lời nêu rõ điều đã thực hiện và bằng chứng hiện có. Chẳng hạn, FL cho phép phối hợp học nhưng chưa có bảo đảm riêng tư tuyệt đối; DAS giảm FAR nhưng F1 thấp hơn ALL trong lượt bốn client; FedProx có số hạng neo trong loss chứ không phải bộ lọc client độc hại. Kiến trúc lai là lựa chọn triển khai theo phương pháp tham khảo, chưa có ablation đầy đủ trên pipeline hai nguồn, bốn client để khẳng định từng khối đều cần thiết. Có thể bấm câu hỏi để mở câu trả lời hoặc quay về đúng giai đoạn trên pipeline.
-
-**Chỉ vào hình:** Mở câu hỏi tương ứng, sau đó dùng liên kết về giai đoạn nếu cần minh họa.
-
-**Chuyển ý:** Cảm ơn thầy đã theo dõi. Em xin tiếp tục trao đổi theo câu hỏi.
-
-**Nguồn:** Mã nguồn pipeline multidataset_v1; Các artifact main đã chốt; https://proceedings.mlr.press/v54/mcmahan17a.html; https://arxiv.org/abs/1812.06127
+**Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
 ## Tài liệu phương pháp
 

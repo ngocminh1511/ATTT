@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('36 pages, 9 stages, 6 appendices',()=>{
-  assert.equal(deck.slides.length,36);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,6);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,8,2]);
+check('24 pages, 8 stages, no appendix',()=>{
+  assert.equal(deck.slides.length,24);assert.equal(deck.groups.length,8);assert.equal(deck.appendix.length,0);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,4]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -31,7 +31,7 @@ check('all audience pages render without presenter instructions',()=>{
   }
 });
 check('source and metric combinations do not lose values',()=>{
-  for(const id of ['results-baseline','results-transfer','results-all-das','results-das-tradeoff','results-prox','appendix-metrics']) {
+  for(const id of ['results-scoreboard','results-review','results-confusion']) {
     for(const source of ['cicddos2019','unsw_nb15','mean_over_sources','worst_source','pooled_predictions']) {
       for(const metric of ['f1_macro_present','dos_f1','attack_far_benign','attack_recall','dos_recall','attack_roc_auc']) {
         assert.ok(!/NaN|Infinity|undefined/.test(deck.render(id,{source,metric})),`${id}/${source}/${metric}`);
@@ -39,13 +39,13 @@ check('source and metric combinations do not lose values',()=>{
     }
   }
   for(const method of Object.keys(data.methods))for(const testSource of data.sources)for(const matrixMode of ['percent','count']) {
-    assert.ok(!/NaN|undefined/.test(deck.render('appendix-confusion',{method,testSource,matrixMode})));
+    assert.ok(!/NaN|undefined/.test(deck.render('results-confusion',{method,testSource,matrixMode})));
   }
-  for(const curve of ['das','all','prox'])assert.ok(deck.render('results-heterogeneity',{curve}).includes(`Best vòng ${{das:25,all:13,prox:30}[curve]}`));
+  assert.ok(['60,89%','56,99%','50,26%','3,01%','Local · UNSW #4'].every(x=>deck.render('results-scoreboard').includes(x)));
   assert.ok(['Client 1','Client 2','Client 3','Client 4','18.236','18.237'].every(x=>deck.render('split-clients').includes(x))&&deck.render('train-round',{step:3}).includes('0,25'));
-  for(const id of ['local_c1','local_c2','local_c3','local_c4'])assert.ok(deck.render('results-baseline').includes(id==='local_c1'?'CIC #1':id==='local_c2'?'CIC #2':id==='local_c3'?'UNSW #3':'UNSW #4'));
-  const prox=data.methods.prox.rounds.at(-1);assert.ok(deck.render('results-heterogeneity',{curve:'prox',round:30}).includes(pct(prox.val_f1mp_unsw_nb15)));
-  for(const rankingSource of ['pooled','client_1','client_2','client_3','client_4']){assert.ok(!/NaN/.test(deck.render('select-ranking',{rankingSource})));assert.ok(!/NaN/.test(deck.render('appendix-ranking',{rankingSource})));}
+  for(const id of ['local_c1','local_c2','local_c3','local_c4'])assert.ok(deck.render('results-scoreboard').includes(id==='local_c1'?'CIC #1':id==='local_c2'?'CIC #2':id==='local_c3'?'UNSW #3':'UNSW #4'));
+  assert.ok(deck.render('results-review').includes('16,96%')&&deck.render('results-metrics').includes('FAR'));
+  for(const rankingSource of ['pooled','client_1','client_2','client_3','client_4']){assert.ok(!/NaN/.test(deck.render('select-ranking',{rankingSource})));}
   const overview=deck.render('data-problem'),cic=overview,unsw=overview;
   assert.ok(overview.includes('431.371')&&overview.includes('257.673')&&overview.includes('121.368')&&overview.includes('93.000'));
   assert.ok(cic.includes('12/01/2019')&&cic.includes('11/03/2019')&&cic.includes('Portmap')&&!cic.includes('SSDP'));
@@ -58,27 +58,26 @@ check('source and metric combinations do not lose values',()=>{
   for(const attack of data.dataset_catalog.unsw_nb15.attacks)assert.ok(unsw.includes(attack));
 });
 check('hash, forward/back and endpoints',()=>{
-  assert.equal(deck.resolveId('#results-prox'),'results-prox');
+  assert.equal(deck.resolveId('#results-scoreboard'),'results-scoreboard');
   assert.equal(deck.resolveId('#bad-id'),'pipeline');
   assert.equal(deck.resolveId('#%E0%A4%A'),'pipeline');
   assert.equal(deck.neighbor('cover',-1),'cover');assert.equal(deck.neighbor('cover',1),'pipeline');assert.equal(deck.resolveId(''),'cover');
   assert.equal(deck.neighbor('pipeline',-1),'cover');
   assert.equal(deck.neighbor('pipeline',1),'data-problem');
-  assert.equal(deck.neighbor('appendix-qa',1),'appendix-qa');
+  assert.equal(deck.neighbor('results-review',1),'results-review');
   for(let i=0;i<deck.slides.length-1;i++)assert.equal(deck.neighbor(deck.slides[i].id,1),deck.slides[i+1].id);
 });
 check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
-  changed.slides.forEach(s=>{if(s.id==='results-prox'||s.stage==='normalize')s.enabled=false;});
+  changed.slides.forEach(s=>{if(s.id==='results-review'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,33);assert.equal(d.groups.length,8);
-  assert.equal(d.neighbor('results-heterogeneity',1),'results-errors');
+  assert.equal(d.slides.length,21);assert.equal(d.groups.length,7);
+  assert.equal(d.neighbor('results-confusion',1),'results-confusion');
   assert.equal(d.neighbor('features-map',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
   assert.ok(!d.nav('pipeline').includes('normalize-log'));
 });
 check('absent class is N/A; complete validation history and histogram',()=>{
-  assert.ok(deck.render('results-errors',{testSource:'cicddos2019'}).includes('N/A'));
   assert.equal(pct(null),'N/A');assert.equal(pct(0),'0,00%');
   assert.equal(data.histogram.raw.counts.reduce((a,b)=>a+b,0),200000);
   assert.equal(data.histogram.log.counts.reduce((a,b)=>a+b,0),200000);
@@ -140,12 +139,11 @@ check('mounted next/back/hash, selectors, menu, keyboard and loop step',()=>{
   key('Escape');assert.equal(elements['slide-menu'].hidden,true);
   key('n');assert.equal(elements['slide-menu'].hidden,true);
   key('ArrowRight');assert.equal(hash,'#data-problem');key('h');assert.equal(hash,'#pipeline');
-  location.hash='#results-prox';
-  elements.main.handlers.change({target:{dataset:{control:'metric'},value:'attack_far_benign'}});
-  assert.ok(elements.main.innerHTML.includes('FAR mọi tấn công ↓'));
+  location.hash='#results-scoreboard';
+  assert.ok(elements.main.innerHTML.includes('FAR ↓'));
   assert.ok(elements.main.innerHTML.includes('16,96%'));
-  elements['menu-toggle'].handlers.click();location.hash='#results-errors';
-  assert.ok(elements['slide-menu'].innerHTML.includes('Nhìn vào lỗi'));
+  elements['menu-toggle'].handlers.click();location.hash='#results-review';
+  assert.ok(elements['slide-menu'].innerHTML.includes('Nhận xét: ưu và nhược'));
   key('Escape');location.hash='#train-round';
   const action={dataset:{action:'step',value:'3'}};
   listeners.click({target:{closest:selector=>selector==='[data-action]'?action:null}});
@@ -155,9 +153,9 @@ check('mounted next/back/hash, selectors, menu, keyboard and loop step',()=>{
   listeners.click({target:{closest:selector=>selector==='[data-action]'?phaseAction:null}});
   assert.ok(elements.main.innerHTML.includes('fwd_packets'));
   assert.ok(elements.main.innerHTML.includes('spkts'));
-  location.hash='#results-heterogeneity';
-  elements.main.handlers.change({target:{dataset:{control:'round'},value:'18'}});
-  assert.ok(elements.main.innerHTML.includes('Vòng <strong>18</strong>'));
+  location.hash='#results-review';
+  elements.main.handlers.change({target:{dataset:{control:'focus'},value:'prox'}});
+  assert.ok(elements.main.innerHTML.includes('rv-card on'));
   location.hash='#unknown';assert.equal(hash,'#pipeline');
 });
 process.stdout.write(`\n${checks} groups passed. Browser layout/fullscreen/offline require a real browser for visual confirmation.\n`);

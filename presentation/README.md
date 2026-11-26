@@ -2,9 +2,9 @@
 
 Mở **index.html** bằng trình duyệt. File này chứa giao diện, nội dung dành cho người nghe, số liệu và SVG; có thể chép riêng sang máy khác và dùng offline. Không cần server, Node, CDN hay raw dataset để trình chiếu. Kịch bản lời nói chỉ nằm trong **kich_ban.md**.
 
-Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 26 trang chính (00–25) và 6 trang phụ lục (A1–A6).
+Bản hiện tại trình bày pipeline **4 client**: CIC-DDoS2019 → client 1, 2; UNSW-NB15 → client 3, 4 (mỗi client 50.000 train / 10.000 validation, chia phân tầng theo nhãn gốc; test giữ theo nguồn). Trang đầu là pipeline 9 giai đoạn. Bấm một giai đoạn để vào nhóm slide; phần so sánh phương pháp nằm trong giai đoạn 8. Có 24 trang (00–23), 8 giai đoạn, không có phụ lục và chương kết luận; ma trận nhầm lẫn nằm trong giai đoạn 8.
 
-Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải thích lớn. Trang đầu có hình minh họa mạng học liên kết và pipeline SVG với các gói cập nhật chuyển động. Toàn bộ slide chính dùng sơ đồ, ví dụ trực quan hoặc biểu đồ; bảng tham chiếu chi tiết nằm ở phụ lục. Hiệu ứng xuất hiện, đường truyền, bộ lọc và đường học dùng CSS/SVG; tự giảm chuyển động theo thiết lập hệ điều hành.
+Giao diện trình chiếu dùng nền sáng, chữ tối và các hình giải thích lớn. Trang đầu có hình minh họa mạng học liên kết và pipeline SVG với các gói cập nhật chuyển động. Toàn bộ slide chính dùng sơ đồ, ví dụ trực quan hoặc biểu đồ. Hiệu ứng xuất hiện, đường truyền, bộ lọc và đường học dùng CSS/SVG; tự giảm chuyển động theo thiết lập hệ điều hành.
 
 ## Điều khiển
 
@@ -35,7 +35,7 @@ python presentation/build.py --check
 
 Build thông thường chỉ cần Python chuẩn và snapshot đi kèm; sinh lại `index.html` dành cho người nghe và `kich_ban.md` dành riêng cho người nói. Các trường lời nói, mục tiêu, chuyển ý và hướng dẫn không được nhúng vào HTML. Không sửa trực tiếp file sinh nếu muốn giữ thay đổi sau lần build tiếp theo.
 
-`src/visuals.js` dựng các hình giải thích; `src/app.js` giữ điều hướng, điều khiển và phần phụ lục. Trang bìa (slide 00) có thông tin đề tài, GVHD, SVTH, logo `assets/logo-dut.png` (nhúng base64 để mở offline) và hình học liên kết động vẽ bằng SVG (một vòng: gửi mô hình → học cục bộ → gửi trọng số → tổng hợp). Sơ đồ 9 giai đoạn nằm ở slide 01 `pipeline`; phím H quay về slide này. `assets/federated-network.png` không còn được nhúng.
+`src/visuals.js` dựng các hình giải thích; `src/app.js` giữ điều hướng và điều khiển. Trang bìa (slide 00) có thông tin đề tài, GVHD, SVTH, logo `assets/logo-dut.png` (nhúng base64 để mở offline) và hình học liên kết động vẽ bằng SVG (một vòng: gửi mô hình → học cục bộ → gửi trọng số → tổng hợp). Sơ đồ 9 giai đoạn nằm ở slide 01 `pipeline`; phím H quay về slide này. `assets/federated-network.png` không còn được nhúng.
 
 Giai đoạn 1 gồm tổng quan hai bộ dữ liệu, CIC-DDoS2019 và UNSW-NB15. `data/datasets.json` lưu bối cảnh benchmark từ UNB/UNSW cùng thống kê đã kiểm kê trên các file đầu vào: CIC 431.371 dòng / 78 cột; UNSW 175.341 + 82.332 dòng / 45 cột. Phân biệt các số này với quy mô benchmark gốc và subset test của bài. Khi thay phiên bản raw, cập nhật lại kiểm kê trong file này trước khi refresh snapshot.
 
