@@ -63,6 +63,7 @@ class Engine:
             model, meta = load_checkpoint(ck)
             self.models[key] = (model.eval(), meta)
         self.active = "prox"
+        self.tau = 0.8  # cho qua khi P(BENIGN) >= tau; cao hơn = chặn mạnh hơn
         self.features = self.models["prox"][1]["features"]
         # Kho mẫu: pool[sample_type][source] = list flow test có nhãn thật tương ứng.
         # "both" gộp cả hai nguồn (dùng chung object, không nhân đôi bộ nhớ).
@@ -94,7 +95,7 @@ class Engine:
         _, meta = self.models[self.active]
         name = "FedProx μ=0,1" if self.active == "prox" else "FedAvg (DAS)"
         return {"active": self.active, "name": name, "arch": meta.get("arch", "resvgg_swin"),
-                "round": meta.get("round"), "classes": CLASSES}
+                "round": meta.get("round"), "classes": CLASSES, "tau": round(self.tau, 3)}
 
     def check(self, sample_type: str, client_ip: str, source: str = "both") -> dict:
         """Bốc một flow test đúng loại (lọc theo nguồn nếu có), chạy model, ghi log."""
@@ -109,7 +110,7 @@ class Engine:
             logits = model(torch.tensor(s["x"]).unsqueeze(0))
             prob = torch.softmax(logits, 1).numpy()[0]
         pred = int(prob.argmax())
-        allow = pred == 0  # chỉ BENIGN mới cho qua
+        allow = bool(prob[0] >= self.tau)  # cho qua khi đủ tự tin là BENIGN (ngưỡng τ)
         event = {
             "ts": time.strftime("%H:%M:%S"), "ip": client_ip, "sent": sample_type,
             "source": s["source"], "node": SOURCE_NODE.get(s["source"], s["source"]),
@@ -122,6 +123,12 @@ class Engine:
             self.counts["allow" if allow else "block"] += 1
             self.log.appendleft(event)
         return event
+
+    def reset(self) -> None:
+        """Xóa toàn bộ log và đưa bộ đếm cho qua/chặn về 0."""
+        with self.lock:
+            self.counts = {"allow": 0, "block": 0}
+            self.log.clear()
 
     def snapshot(self) -> dict:
         with self.lock:
@@ -205,6 +212,18 @@ class Handler(BaseHTTPRequestHandler):
                 ENGINE.active = m
             self._send(200, json.dumps(ENGINE.model_info()).encode("utf-8"),
                        ctype="application/json; charset=utf-8")
+        elif u.path == "/api/tau":
+            q = parse_qs(u.query)
+            try:
+                ENGINE.tau = max(0.0, min(1.0, float(q.get("value", ["0.8"])[0])))
+            except ValueError:
+                pass
+            self._send(200, json.dumps(ENGINE.model_info()).encode("utf-8"),
+                       ctype="application/json; charset=utf-8")
+        elif u.path == "/api/reset":
+            ENGINE.reset()
+            self._send(200, json.dumps(ENGINE.snapshot(), ensure_ascii=False).encode("utf-8"),
+                       ctype="application/json; charset=utf-8")
         else:
             self._send(404, b"not found")
 
@@ -234,6 +253,10 @@ button.on{background:#2563eb;border-color:#2563eb}
   <span style="flex:1"></span>
   <button id="b-prox" onclick="sw('prox')">FedProx</button>
   <button id="b-das" onclick="sw('das')">FedAvg DAS</button>
+  <span class="pill">Ngưỡng chặn τ: <b id="tauval">0.80</b></span>
+  <input type="range" id="tau" min="0" max="1" step="0.05" value="0.8"
+         oninput="setTau(this.value)" style="width:150px">
+  <button id="b-reset" onclick="resetLog()" title="Xóa log và đưa bộ đếm về 0">🗑 Xóa log</button>
 </header>
 <div class="wrap">
   <div class="card allow"><div class="lbl">Đã cho qua (BENIGN)</div><div class="big" id="allow">0</div></div>
@@ -255,6 +278,10 @@ async function tick(){
     document.getElementById('total').textContent=t;
     document.getElementById('rate').textContent = t? Math.round(100*b/t)+'%':'0%';
     document.getElementById('model').textContent = 'Model: '+d.model.name+' · vòng '+(d.model.round??'?');
+    if(d.model.tau!=null && document.activeElement.id!=='tau'){
+      document.getElementById('tauval').textContent = Number(d.model.tau).toFixed(2);
+      document.getElementById('tau').value = d.model.tau;
+    }
     document.getElementById('b-prox').className = d.model.active==='prox'?'on':'';
     document.getElementById('b-das').className = d.model.active==='das'?'on':'';
     const rows = d.log.map(e=>{
@@ -267,6 +294,14 @@ async function tick(){
   }catch(err){}
 }
 async function sw(m){ await fetch('/api/switch?model='+m,{method:'POST'}); tick(); }
+async function setTau(v){
+  document.getElementById('tauval').textContent = Number(v).toFixed(2);
+  await fetch('/api/tau?value='+v,{method:'POST'}); tick();
+}
+async function resetLog(){
+  if(!confirm('Xóa toàn bộ log và đưa bộ đếm về 0?')) return;
+  await fetch('/api/reset',{method:'POST'}); tick();
+}
 tick(); setInterval(tick, 800);
 </script></body></html>"""
 
