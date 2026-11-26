@@ -294,6 +294,7 @@
       if(!slide) return '<p>Không còn slide nào được bật. Hãy bật lại nội dung trong slides.json.</p>';
       if(slide.view==='home') return home();
       if(slide.view==='roadmap') return visuals?visuals.roadmap():'';
+      if(slide.view==='thanks') return visuals?visuals.thanks():'<h1>Cảm ơn thầy cô đã lắng nghe</h1>';
       const group=stageOf(slide),idx=group?.slides.indexOf(slide)||0;
       const sectionLabel=slide.stage==='appendix'?'PHỤ LỤC':`GIAI ĐOẠN ${String(content.stages.findIndex(g=>g.id===slide.stage)+1).padStart(2,'0')}`;
       const submenu='';  // bỏ dãy số trang con của chương kết quả
@@ -340,7 +341,7 @@
       el('progress').style.width=`${(idx+1)/deck.slides.length*100}%`;
       el('previous').disabled=idx===0;el('next').disabled=idx===deck.slides.length-1;
       document.title=`${slide?.number||''} · ${slide?.title||'Thuyết trình'} — Học liên kết`;
-      document.body.classList.toggle('is-home',slide?.view==='home'||slide?.view==='roadmap');document.body.classList.toggle('is-cover',slide?.view==='home');
+      document.body.classList.toggle('is-home',slide?.view==='home'||slide?.view==='roadmap'||slide?.view==='thanks');document.body.classList.toggle('is-cover',slide?.view==='home'||slide?.view==='thanks');
       if(activeDrawer==='menu')menu.innerHTML=deck.renderMenu(current);
     }
     function go(id) {

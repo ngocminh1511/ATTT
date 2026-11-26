@@ -308,6 +308,17 @@
       "transition":"Đó là toàn bộ phần trình bày của nhóm em; em xin sẵn sàng trả lời câu hỏi của thầy.",
       "defense":"Demo là IDS mô phỏng ở mức ứng dụng, không phải thiết bị chặn gói inline; mục tiêu là minh họa mô hình ra quyết định, không phải đo throughput.",
       "sources":["demo_live/May_server/serve.py", "demo_live/May_attack/attack.py"]
+    },
+    {
+      "id":"thanks","number":"25","stage":"home","enabled":true,"view":"thanks",
+      "title":"Cảm ơn thầy cô đã lắng nghe",
+      "message":"Kết thúc phần trình bày; nhóm em sẵn sàng nhận câu hỏi.",
+      "bullets":["Cảm ơn thầy cô", "Hỏi & đáp"],
+      "goal":"Kết thúc bài trình bày và mở phần hỏi đáp.",
+      "speech":"Phần trình bày của nhóm em đến đây là hết. Em xin cảm ơn thầy cô đã lắng nghe, nhóm em rất mong nhận được câu hỏi và góp ý của thầy cô.",
+      "point":"Để màn hình này trong suốt phần hỏi đáp.",
+      "transition":"Mở phần hỏi đáp.",
+      "sources":["—"]
     }
   ]
 }

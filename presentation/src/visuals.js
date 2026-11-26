@@ -102,6 +102,16 @@
         <span class="hero-date">Đà Nẵng, 11/2026</span>
       </div></section>`;
     }
+    function thanks(){
+      // Trang kết thúc: cùng nền mạng học liên kết như trang bìa.
+      return `<section class="hero thanks">${heroNetwork()}<div class="hero-content">
+        <p class="ts-kicker">Thank you</p>
+        <h1>Cảm ơn thầy cô<br><em>đã lắng nghe</em></h1>
+        <p class="ts-sub">Học liên kết phát hiện tấn công mạng trên CIC-DDoS2019 và UNSW-NB15</p>
+        <dl class="ts-people"><div><dt>Sinh viên thực hiện</dt><dd>Phan Văn Hiếu<span>MSSV 102230120</span></dd><dd>Đoàn Ngọc Minh<span>MSSV 102230157</span></dd></div></dl>
+        <span class="hero-date">Hỏi &amp; đáp</span>
+      </div></section>`;
+    }
     function roadmap(){
       const positions=[[150,50],[375,50],[600,50],[825,50],[1050,50],[1050,210],[825,210],[600,210],[375,210]];
       const names=[['Tổng quan','dữ liệu'],['Làm sạch','& đồng nhất'],['Phân chia','dữ liệu'],['Xây dựng','đặc trưng'],['Chuẩn hóa','dữ liệu'],['Lựa chọn','đặc trưng'],['Kiến trúc','& huấn luyện'],['Đánh giá','kết quả'],['Demo','trực tiếp']];
@@ -498,7 +508,7 @@
         default:return null;
       }
     }
-    return {home,roadmap,render};
+    return {home,roadmap,thanks,render};
   }
   const api={create};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;

@@ -369,3 +369,4 @@ body.is-cover .hero{border-radius:16px}
 .rv-card.on{box-shadow:0 0 0 2px var(--c)}
 .rv-card b{color:#17263c;font-size:clamp(13px,1vw,16px)}.rv-card .pro{color:#17683f}.rv-card .con{color:#a33b25}
 @media(max-width:900px){.rv-wrap{grid-template-columns:1fr}}
+.hero.thanks .ts-kicker{margin:0;font-size:clamp(14px,1.1vw,18px);letter-spacing:3px;text-transform:uppercase;color:#79e6b6;font-weight:700}

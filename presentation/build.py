@@ -259,8 +259,8 @@ def validate_snapshot(data):
 
 def validate_content(content):
     slides, stages = content["slides"], content["stages"]
-    if len(stages) != 9 or len(slides) != 25:
-        raise ValueError("Cần 9 giai đoạn và 25 trang")
+    if len(stages) != 9 or len(slides) != 26:
+        raise ValueError("Cần 9 giai đoạn và 26 trang")
     if len({s["id"] for s in slides}) != len(slides):
         raise ValueError("ID slide bị trùng")
     known = {s["id"] for s in stages} | {"home", "appendix"}

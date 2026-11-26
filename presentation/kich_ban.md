@@ -653,6 +653,29 @@ Biểu đồ radar này gom sáu chỉ số, càng ra ngoài càng tốt; mỗi 
 
 **Nguồn:** demo_live/May_server/serve.py; demo_live/May_attack/attack.py
 
+## 25 · Cảm ơn thầy cô đã lắng nghe
+
+**Giai đoạn:** Pipeline · **Trạng thái:** Đang bật
+
+**Thông điệp:** Kết thúc phần trình bày; nhóm em sẵn sàng nhận câu hỏi.
+
+**Mục tiêu:** Kết thúc bài trình bày và mở phần hỏi đáp.
+
+**Nội dung trên slide:**
+
+- Cảm ơn thầy cô
+- Hỏi & đáp
+
+**Lời trình bày:**
+
+Phần trình bày của nhóm em đến đây là hết. Em xin cảm ơn thầy cô đã lắng nghe, nhóm em rất mong nhận được câu hỏi và góp ý của thầy cô.
+
+**Chỉ vào hình:** Để màn hình này trong suốt phần hỏi đáp.
+
+**Chuyển ý:** Mở phần hỏi đáp.
+
+**Nguồn:** —
+
 ## Tài liệu phương pháp
 
 - [FedAvg · McMahan et al. (2017)](https://proceedings.mlr.press/v54/mcmahan17a.html)
