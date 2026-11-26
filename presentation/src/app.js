@@ -267,6 +267,24 @@
           ['Bằng chứng độc lập train / test đã đủ chưa?','Train/val không trùng nhóm theo kiểm tra. Vẫn có vector trùng với test được báo cáo. Cần rà soát thêm và đánh giá trên dữ liệu độc lập.','appendix-audit'],
           ['Vì sao không chọn ngưỡng tốt nhất bằng test?','Test dùng đánh giá sau khi chốt. Chọn ngưỡng hoặc μ theo validation; cần test độc lập nếu các kết quả test cũ đã được dùng để định hướng thử nghiệm.','conclusion-next']
         ].map(([q,a,link])=>`<details class="qa-item"><summary>${esc(q)}</summary><p>${esc(a)}</p>${byId.has(link)?`<a href="#${link}">Xem slide liên quan →</a>`:''}</details>`).join('');
+        case 'demo-arch': {
+          const bx=(x,y,w,h,fill,stroke,sw=2)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+          const tl=(x,y,str,size,col,weight='400',anchor='middle')=>text(x,y,str,`text-anchor="${anchor}" font-size="${size}" font-weight="${weight}" fill="${col}"`);
+          const ar=(x1,y1,x2,y2,col)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="2.5" marker-end="url(#dm-arrow)"/>`;
+          let b=`<defs><marker id="dm-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" fill="#7187a5"/></marker></defs>`;
+          b+=bx(36,165,214,130,'#fff1f0','#e0a69d')+tl(143,200,'MÁY B',22,'#b4453a','700')+tl(143,228,'Thiết bị tấn công',16,'#8a5a54')+tl(143,255,'Script bắn 3 pha',14,'#7b8290')+tl(143,277,'benign · DoS/DDoS · khác',12,'#9aa3af');
+          b+=ar(250,228,398,228,'#7187a5')+tl(324,212,'HTTP · mạng LAN',13,'#5c6b82','600')+tl(324,251,'mỗi request = 1 flow',12,'#8a93a3');
+          b+=bx(400,52,566,366,'#eef4ff','#7fa7e8',2.5)+tl(683,84,'MÁY A · SERVER',20,'#1d3557','700');
+          b+=bx(430,112,150,70,'#ffffff','#b9cce5')+tl(505,147,'Trang web',16,'#1d3557','600')+tl(505,168,'cổng vào',12,'#6b7280');
+          b+=ar(580,147,628,147,'#7187a5');
+          b+=bx(628,108,306,78,'#e9fbf1','#5fc698')+tl(781,140,'Mô hình gác cửa',17,'#176b45','700')+tl(781,164,'ResVGG-SwinNet · suy luận thật',13,'#3f8a66');
+          b+=ar(742,186,592,244,'#16a34a')+ar(820,186,812,244,'#dc2626');
+          b+=bx(440,246,220,66,'#eafaf0','#16a34a')+tl(550,276,'BENIGN → cho qua',15,'#15803d','700')+tl(550,298,'HTTP 200 · ALLOW',12,'#16a34a');
+          b+=bx(700,246,232,66,'#fdecec','#dc2626')+tl(816,276,'Tấn công → chặn',15,'#b91c1c','700')+tl(816,298,'HTTP 403 · BLOCK',12,'#dc2626');
+          b+=bx(440,332,492,58,'#f1f5fb','#b9cce5')+tl(686,360,'Dashboard: đếm ALLOW / BLOCK + nhật ký thời gian thực',15,'#334d71','600');
+          b+=ar(550,312,560,330,'#9fb1cc')+ar(816,312,806,330,'#9fb1cc');
+          return svg(b,1000,452,'Sơ đồ demo hai máy: máy B tấn công, máy A gác cửa bằng mô hình');
+        }
         default: throw new Error(`Không hỗ trợ view: ${slide.view}`);
       }
     }

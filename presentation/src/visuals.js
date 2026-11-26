@@ -22,6 +22,7 @@
       train:'M10 14L32 8L54 18L49 45L29 56L10 43ZM10 14L29 31L54 18M10 43L29 31L49 45M32 8L29 31L29 56',
       results:'M8 7V56H59M17 43L29 31L39 38L55 17M46 17H55V26',
       conclusion:'M32 6A26 26 0 1 0 58 32M20 31L29 40L54 13',
+      demo:'M8 12H56V40H8ZM26 40L24 52M38 40L40 52M18 52H46M27 20L37 26L27 32Z',
       server:'M8 9H56V24H8ZM8 28H56V43H8ZM8 47H56V59H8ZM15 16H18M15 35H18M15 53H18M37 16H49M37 35H49',
       lock:'M16 28H48V57H16ZM23 28V18C23 4 42 4 42 18V28M32 39V47',
       clock:'M32 6A26 26 0 1 0 32 58A26 26 0 1 0 32 6M32 16V32L43 40',
@@ -102,19 +103,20 @@
       </div></section>`;
     }
     function roadmap(){
-      const positions=[[150,50],[450,50],[750,50],[1050,50],[1050,210],[750,210],[450,210],[150,210]];
-      const names=[['Tổng quan','dữ liệu'],['Làm sạch','& đồng nhất'],['Phân chia','dữ liệu'],['Xây dựng','đặc trưng'],['Chuẩn hóa','dữ liệu'],['Lựa chọn','đặc trưng'],['Kiến trúc','& huấn luyện'],['Đánh giá','kết quả'],['Kết luận','& hướng đi']];
+      const positions=[[150,50],[375,50],[600,50],[825,50],[1050,50],[1050,210],[825,210],[600,210],[375,210]];
+      const names=[['Tổng quan','dữ liệu'],['Làm sạch','& đồng nhất'],['Phân chia','dữ liệu'],['Xây dựng','đặc trưng'],['Chuẩn hóa','dữ liệu'],['Lựa chọn','đặc trưng'],['Kiến trúc','& huấn luyện'],['Đánh giá','kết quả'],['Demo','trực tiếp']];
+      const kinds=['data','clean','split','features','normalize','select','train','results','demo'];
       let body='';
       for(let i=0;i<groups.length-1;i++){
         const [x,y]=positions[i],[nx,ny]=positions[i+1];
-        const d=i===3?`M${x},${y+40} C${x+80},${y+70} ${nx+80},${ny-70} ${nx},${ny-40}`:i<3?`M${x+48},${y} L${nx-48},${ny}`:`M${x-48},${y} L${nx+48},${ny}`;
+        const d=y!==ny?`M${x},${y+40} L${nx},${ny-40}`:(nx>x?`M${x+48},${y} L${nx-48},${ny}`:`M${x-48},${y} L${nx+48},${ny}`);
         body+=edge(d,'#b6c8e0',true);
       }
       groups.forEach(g=>{
-        const i=content.stages.findIndex(s=>s.id===g.id),[x,y]=positions[i],kind=['data','clean','split','features','normalize','select','train','results','conclusion'][i];
-        body+=`<a href="#${g.slides[0].id}" class="pipeline-stop" style="--order:${i}" aria-label="${e(g.title)}">${circle(x,y,39,i===7?'#e2efff':'#f1f5fb','class="stop-disc"')}${icon(kind,x-22,y-22,44,i===7?C.coral:C.blue)}${tx(x-54,y-35,String(i+1).padStart(2,'0'),'s-stage-index')}${lines(x,y+63,names[i],'s-pipeline-title',24,'text-anchor="middle"')}</a>`;
+        const i=content.stages.findIndex(s=>s.id===g.id),[x,y]=positions[i],kind=kinds[i],accent=i>=7;
+        body+=`<a href="#${g.slides[0].id}" class="pipeline-stop" style="--order:${i}" aria-label="${e(g.title)}">${circle(x,y,39,accent?'#e2efff':'#f1f5fb','class="stop-disc"')}${icon(kind,x-22,y-22,44,accent?C.coral:C.blue)}${tx(x-54,y-35,String(i+1).padStart(2,'0'),'s-stage-index')}${lines(x,y+63,names[i],'s-pipeline-title',24,'text-anchor="middle"')}</a>`;
       });
-      return `<section class="roadmap"><header class="roadmap-head"><h1>Quy trình thực hiện</h1><span>${groups.length} giai đoạn</span></header><section class="pipeline-map">${frame(body,'Pipeline tám giai đoạn',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span></div></section>`;
+      return `<section class="roadmap"><header class="roadmap-head"><h1>Quy trình thực hiện</h1><span>${groups.length} giai đoạn</span></header><section class="pipeline-map">${frame(body,'Pipeline chín giai đoạn',1200,300)}</section><div class="cover-bottom"><span>ResVGG-SwinNet · FedAvg · DAS · FedProx</span></div></section>`;
     }
 
     function bars(keys,metric,source){

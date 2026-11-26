@@ -627,6 +627,32 @@ Biểu đồ radar này gom sáu chỉ số, càng ra ngoài càng tốt; mỗi 
 
 **Nguồn:** results_modal_multidataset/20261122_152058_5ec64a/main/*/evaluation_by_dataset.csv; results_modal_multidataset/20261122_235344_298853/main/das/evaluation_by_dataset.csv
 
+## 24 · Demo trực tiếp: web có mô hình gác cửa
+
+**Giai đoạn:** Demo trực tiếp hai máy · **Trạng thái:** Đang bật
+
+**Thông điệp:** Máy A chạy web tích hợp mô hình gác cửa, máy B bắn lưu lượng; mỗi truy cập thành một flow, mô hình quyết định cho qua (BENIGN) hay chặn (tấn công) theo thời gian thực.
+
+**Mục tiêu:** Cho thấy mô hình đã huấn luyện được đặt vào một luồng xử lý thật, không chỉ là bảng số.
+
+**Nội dung trên slide:**
+
+- Máy B bắn lưu lượng → máy A: mỗi request thành một flow 8 trường (phát lại từ test)
+- Máy A: web → mô hình ResVGG-SwinNet gác cửa → BENIGN cho qua (200), tấn công chặn (403)
+- Dashboard đếm ALLOW / BLOCK + nhật ký thời gian thực; hai máy cùng mạng LAN
+
+**Lời trình bày:**
+
+Để kết thúc, nhóm em trình bày một demo trực tiếp gồm hai thiết bị cùng một mạng. Thiết bị B đóng vai kẻ tấn công, bắn lưu lượng sang thiết bị A theo ba pha: truy cập bình thường, tấn công DoS/DDoS và tấn công khác. Thiết bị A chạy một trang web, nhưng trước mỗi truy cập, luồng được quy thành một flow tám trường rồi đưa qua mô hình ResVGG-SwinNet đã huấn luyện như một lá chắn: nếu mô hình kết luận bình thường thì trả trang web với mã hai trăm, nếu có dấu hiệu tấn công thì từ chối với mã bốn linh ba. Sơ đồ bên phải mô tả đúng đường đi này, kết thúc ở hai nhánh cho qua và chặn, cùng bảng điều khiển đếm số lượt theo thời gian thực. Điểm cần nhấn mạnh: mô hình chạy suy luận thật trên từng luồng, không phải kết quả tính sẵn; và kết quả quan sát được nhất quán với phần đánh giá, chặn tốt lưu lượng UNSW nhưng còn bỏ sót DDoS của CIC.
+
+**Chỉ vào hình:** Đi theo sơ đồ từ máy B sang máy A, rồi trong máy A: web → mô hình → hai nhánh cho qua và chặn.
+
+**Chuyển ý:** Đó là toàn bộ phần trình bày của nhóm em; em xin sẵn sàng trả lời câu hỏi của thầy.
+
+**Nếu thầy hỏi:** Demo là IDS mô phỏng ở mức ứng dụng, không phải thiết bị chặn gói inline; mục tiêu là minh họa mô hình ra quyết định, không phải đo throughput.
+
+**Nguồn:** demo_live/May_server/serve.py; demo_live/May_attack/attack.py
+
 ## Tài liệu phương pháp
 
 - [FedAvg · McMahan et al. (2017)](https://proceedings.mlr.press/v54/mcmahan17a.html)

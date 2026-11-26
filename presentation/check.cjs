@@ -12,9 +12,9 @@ const deck = createDeck({content,data});
 let checks=0;
 function check(name, test) { test(); checks++; process.stdout.write(`OK ${name}\n`); }
 
-check('24 pages, 8 stages, no appendix',()=>{
-  assert.equal(deck.slides.length,24);assert.equal(deck.groups.length,8);assert.equal(deck.appendix.length,0);
-  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,4]);
+check('25 pages, 9 stages, no appendix',()=>{
+  assert.equal(deck.slides.length,25);assert.equal(deck.groups.length,9);assert.equal(deck.appendix.length,0);
+  assert.deepEqual(deck.groups.map(s=>s.slides.length),[1,3,2,1,2,4,5,4,1]);
 });
 check('all audience pages render without presenter instructions',()=>{
   for(const slide of deck.slides) {
@@ -64,15 +64,16 @@ check('hash, forward/back and endpoints',()=>{
   assert.equal(deck.neighbor('cover',-1),'cover');assert.equal(deck.neighbor('cover',1),'pipeline');assert.equal(deck.resolveId(''),'cover');
   assert.equal(deck.neighbor('pipeline',-1),'cover');
   assert.equal(deck.neighbor('pipeline',1),'data-problem');
-  assert.equal(deck.neighbor('results-review',1),'results-review');
+  assert.equal(deck.neighbor('demo-architecture',1),'demo-architecture');
+  assert.equal(deck.neighbor('results-review',1),'demo-architecture');
   for(let i=0;i<deck.slides.length-1;i++)assert.equal(deck.neighbor(deck.slides[i].id,1),deck.slides[i+1].id);
 });
 check('disabled page/stage is skipped without broken links',()=>{
   const changed=structuredClone(content);
   changed.slides.forEach(s=>{if(s.id==='results-review'||s.stage==='normalize')s.enabled=false;});
   const d=createDeck({content:changed,data});
-  assert.equal(d.slides.length,21);assert.equal(d.groups.length,7);
-  assert.equal(d.neighbor('results-confusion',1),'results-confusion');
+  assert.equal(d.slides.length,22);assert.equal(d.groups.length,8);
+  assert.equal(d.neighbor('results-confusion',1),'demo-architecture');
   assert.equal(d.neighbor('features-map',1),'select-das');
   for(const s of d.slides)for(const match of d.render(s.id).matchAll(/href="#([^"]+)"/g))assert.ok(d.byId.has(match[1]),`${s.id} → ${match[1]}`);
   assert.ok(!d.nav('pipeline').includes('normalize-log'));
